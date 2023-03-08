@@ -1,0 +1,28 @@
+[package]
+name = "rkvm2-input"
+version = "0.2.0"
+authors = ["Jan Trefil <8711792+htrefil@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.117", features = ["derive"] }
+futures = "0.3.8"
+log = "0.4.11"
+rkvm2-proto = { path = "../proto" }
+#arboard = { version = "3.2.0", features = ["wayland-data-control"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+#notify-rust = "4"
+inotify = "0.10.0"
+tokio = { version = "1.26.0", features = ["fs", "io-util", "net", "sync", "rt", "time"] }
+nix = "0.26.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3.9", features = ["winuser"] }
+tokio = { version = "1.26.0", features = ["sync"] }
+
+[build-dependencies]
+bindgen = "0.64.0"
+pkg-config = "0.3.19"

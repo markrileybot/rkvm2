@@ -1,0 +1,1714 @@
+syntax = "proto3";
+
+package rkvm2.proto;
+option java_multiple_files = true;
+option java_outer_classname = "Rkvm2Proto";
+
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+/**************************************************************
+
+ Model structs and enums
+
+ **************************************************************/
+//
+///**
+// * Because we can support multiple proxies and ids do not have
+// * to be unique across them, this represents an id that is unique
+// * by combining the proxy id and the sys id.
+// */
+//message SysId {
+//  /**
+//   * the id of the proxy
+//   */
+//  string proxyId = 1;
+//  /**
+//   * A u8 id for the system
+//   */
+//  uint32 sysId = 2;
+//}
+//
+///**
+// * Type of gps fix
+// */
+//enum GpsFixType {
+//  /**
+//   * No GPS connected
+//   */
+//  NoGps = 0;
+//  /**
+//   * No position information, GPS is connected
+//   */
+//  NoFix = 1;
+//  /**
+//   * 2D position
+//   */
+//  GpsFixType2dFix = 2;
+//  /**
+//   * 3D position
+//   */
+//  GpsFixType3dFix = 3;
+//  /**
+//   * DGPS/SBAS aided 3D position
+//   */
+//  Dgps = 4;
+//  /**
+//   * RTK float, 3D position
+//   */
+//  RtkFloat = 5;
+//  /**
+//   * RTK Fixed, 3D position
+//   */
+//  RtkFixed = 6;
+//  /**
+//   * Static fixed, typically used for base stations
+//   */
+//  Static = 7;
+//  /**
+//   * PPP, 3D position.
+//   */
+//  Ppp = 8;
+//}
+//
+///**
+// * A WGS84 location
+// */
+//message GeoPoint {
+//  /**
+//   * The WGS84 longitude in decimal degrees
+//   */
+//  float latitude = 1;
+//  /**
+//   * The WGS84 longitude in decimal degrees
+//   */
+//  float longitude = 2;
+//  /**
+//   * The altitude (MSL)
+//   */
+//  float altitude = 3;
+//}
+//
+///**
+// * A geo location reading
+// */
+//message GeoReading {
+//  /**
+//   * The time that this reading was taken in
+//   * milliseconds since unix epoch
+//   */
+//  google.protobuf.Timestamp time = 1;
+//  /**
+//   * The WGS84 point
+//   */
+//  GeoPoint point = 2;
+//  /**
+//   * bearing in degrees from true north (todo: this might be mag)
+//   */
+//  float bearing = 3;
+//  /**
+//   * speed in m/s
+//   */
+//  float speed = 4;
+//  /**
+//   * GPS HDOP horizontal dilution of position (unitless)
+//   */
+//  float hdop = 5;
+//  /**
+//   * GPS VDOP vertical dilution of position (unitless)
+//   */
+//  float vdop = 6;
+//  /**
+//   * Fix type
+//   */
+//  GpsFixType fixType = 7;
+//  /**
+//   * Num visible satellites
+//   */
+//  uint32 visibleSatelliteCount = 8;
+//}
+//
+//message Battery {
+//  uint32 voltage = 1;
+//  uint32 current = 2;
+//  int32 remaining = 3;
+//}
+//
+///**
+// * Tube state info
+// */
+//enum TubeState {
+//  /**
+//   * The tube is not loaded
+//   */
+//  NotLoaded = 0;
+//  /**
+//   * The tube is loaded.  A sys_id should be set in the tube struct
+//   */
+//  Loaded = 1;
+//  /**
+//   * The tube is firing
+//   */
+//  Launching = 2;
+//  /**
+//   * The launch failed.  This is a bad state and we shouldn't go back to LOADED
+//   * unless something explicit happens.  We still need to decide what that explicit
+//   * thing is.
+//   */
+//  LaunchFailed = 3;
+//  /**
+//   * The cap is charging
+//   */
+//  Charging = 4;
+//}
+//
+///**
+// * A launcher
+// */
+//message Launcher {
+//  /**
+//   * The set of tubes
+//   */
+//  repeated Tube tube = 1;
+//  /**
+//   * The geo location
+//   */
+//  GeoReading location = 2;
+//  /**
+//   * The name of the launcher
+//   */
+//  string name = 3;
+//  /**
+//   * The charge state
+//   */
+//  Battery battery = 4;
+//  /**
+//   * The configured safe radius around the launcher
+//   */
+//  uint32 safeDistance = 5;
+//  /**
+//   * Is the airspace around the launcher clear?
+//   */
+//  bool airspaceClear = 6;
+//}
+//
+///**
+// * A tube
+// */
+//message Tube {
+//  /**
+//   * The ID
+//   */
+//  int32 id = 1;
+//  /**
+//   * The state
+//   */
+//  TubeState state = 2;
+//  /**
+//   * The sys id of the drone that's loaded into the tube if the tube is loaded.
+//   */
+//  SysId sysId = 3;
+//  /**
+//   * The cap charge value
+//   */
+//  uint32 charge = 4;
+//}
+//
+//enum Severity {
+//  /**
+//   * Indicates the severity level, generally used for status messages to indicate their relative urgency. Based on RFC-5424 using expanded definitions at: <http://www.kiwisyslog.com/kb/info:-syslog-message-levels/.>
+//   * System is unusable. This is a "panic" condition.
+//   */
+//  Emergency = 0;
+//  /**
+//   * Action should be taken immediately. Indicates error in non-critical systems.
+//   */
+//  Alert = 1;
+//  /**
+//   * Action must be taken immediately. Indicates failure in a primary system.
+//   */
+//  Critical = 2;
+//  /**
+//   * Indicates an error in secondary/redundant systems.
+//   */
+//  Error = 3;
+//  /**
+//   * Indicates about a possible future error if this is not resolved within a given timeframe. Example would be a low battery warning.
+//   */
+//  Warning = 4;
+//  /**
+//   * An unusual event has occurred, though not an error condition. This should be investigated for the root cause.
+//   */
+//  Notice = 5;
+//  /**
+//   * Normal operational messages. Useful for logging. No action is required for these messages.
+//   */
+//  Info = 6;
+//  /**
+//   * Useful non-operational messages that can assist in debugging. These should not occur during normal operation.
+//   */
+//  Debug = 7;
+//}
+//
+//enum DroneState {
+//  /**
+//   * Uninitialized system, state is unknown.
+//   */
+//  Uninit = 0;
+//  /**
+//   * System is booting up.
+//   */
+//  Boot = 1;
+//  /**
+//   * System is calibrating and not flight-ready.
+//   */
+//  Calibrating = 2;
+//  /**
+//   * System is grounded and on standby. It can be launched any time.
+//   */
+//  Standby = 3;
+//  /**
+//   * System is active and might be already airborne. Motors are engaged.
+//   */
+//  Active = 4;
+//  /**
+//   * System is in a non-normal flight mode. It can however still navigate.
+//   */
+//  CriticalState = 5;
+//  /**
+//   * System is in a non-normal flight mode. It lost control over parts or over the whole airframe. It is in mayday and going down.
+//   */
+//  EmergencyState = 6;
+//  /**
+//   * System just initialized its power-down sequence, will shut down now.
+//   */
+//  Poweroff = 7;
+//  /**
+//   * System is terminating itself.
+//   */
+//  FlightTermination = 8;
+//}
+//
+//enum AutopilotMode {
+//  /**
+//   * manual airframe angle with manual throttle
+//   */
+//  STABILIZE = 0;
+//  /**
+//   * manual body-frame angular rate with manual throttle
+//   */
+//  ACRO = 1;
+//  /**
+//   * manual airframe angle with automatic throttle
+//   */
+//  ALT_HOLD = 2;
+//  /**
+//   * fully automatic waypoint control using mission commands
+//   */
+//  AUTO = 3;
+//  /**
+//   * fully automatic fly to coordinate or fly at velocity/direction using GCS immediate commands
+//   */
+//  GUIDED = 4;
+//  /**
+//   * automatic horizontal acceleration with automatic throttle
+//   */
+//  LOITER = 5;
+//  /**
+//   * automatic return to launching point
+//   */
+//  RTL = 6;
+//  /**
+//   * automatic circular flight with automatic throttle
+//   */
+//  CIRCLE = 7;
+//  /**
+//   * automatic landing with horizontal position control
+//   */
+//  LAND = 9;
+//  /**
+//   * semi-autonomous position, yaw and throttle control
+//   */
+//  DRIFT = 11;
+//  /**
+//   * manual earth-frame angular rate control with manual throttle
+//   */
+//  SPORT = 13;
+//  /**
+//   * automatically flip the vehicle on the roll axis
+//   */
+//  FLIP = 14;
+//  /**
+//   * automatically tune the vehicle's roll and pitch gains
+//   */
+//  AUTOTUNE = 15;
+//  /**
+//   * automatic position hold with manual override, with automatic throttle
+//   */
+//  POSHOLD = 16;
+//  /**
+//   * full-brake using inertial/GPS system, no pilot input
+//   */
+//  BRAKE = 17;
+//  /**
+//   * throw to launch mode using inertial/GPS system, no pilot input
+//   */
+//  THROW = 18;
+//  /**
+//   * automatic avoidance of obstacles in the macro scale - e.g. full-sized aircraft
+//   */
+//  AVOID_ADSB = 19;
+//  /**
+//   *  guided mode but only accepts attitude and altitude
+//   */
+//  GUIDED_NOGPS = 20;
+//  /**
+//   * SMART_RTL returns to home by retracing its steps
+//   */
+//  SMART_RTL = 21;
+//  /**
+//   * FLOWHOLD holds position with optical flow without rangefinder
+//   */
+//  FLOWHOLD = 22;
+//  /**
+//   * follow attempts to follow another vehicle or ground station
+//   */
+//  FOLLOW = 23;
+//  /**
+//   * ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
+//   */
+//  ZIGZAG = 24;
+//  /**
+//   * System ID mode produces automated system identification signals in the controllers
+//   */
+//  SYSTEMID = 25;
+//  /**
+//   * Autonomous autorotation
+//   */
+//  AUTOROTATE = 26;
+//}
+//
+//message DroneStatusMessage {
+//  /**
+//   * The timestamp for the message
+//   */
+//  google.protobuf.Timestamp time = 1;
+//  /**
+//   * The message severity
+//   */
+//  Severity severity = 2;
+//  /**
+//   * The message text
+//   */
+//  string text = 3;
+//}
+//
+///**
+// * Drone state info
+// */
+//message DroneStatus {
+//  /**
+//   * The current state (per the drone)
+//   */
+//  DroneState state = 1;
+//  /**
+//   * The last status message
+//   */
+//  DroneStatusMessage message = 2;
+//  /**
+//   * current autopilot mode
+//   */
+//  AutopilotMode autopilotMode = 3;
+//}
+//
+///**
+// * Drone mode info.  This is kind of a super-set of base mode and
+// * auto pilot mode.  We don't want to expose user's to this because
+// * it's pretty confusing.  The goal is to expose high-level modes
+// * and, based on context, achieve them using the correct base and
+// * auto-pilot modes in software.
+// */
+//enum DroneMode {
+//  /**
+//   * We haven't heard from the drone yet
+//   */
+//  None = 0;
+//  /**
+//   * The drone is awaiting mode changes.  The drone will not fly in this state
+//   */
+//  StandBy = 1;
+//  /**
+//   * The drone is arming
+//   */
+//  Arming = 2;
+//  /**
+//   * The drone is ready to fly based on context.  If it's loaded into a barrel
+//   * this means that the drone is in throw mode and armed.
+//   */
+//  ReadyToFly = 3;
+//  /**
+//   * The drone is flying
+//   */
+//  Flying = 4;
+//  /**
+//   * The drone is landing
+//   */
+//  Landing = 5;
+//  /**
+//   * The drone is disarming
+//   */
+//  Disarming = 6;
+//}
+//
+///**
+// * Allows us to force the payload into a state
+// * or to use internal state (toggle)
+// */
+//enum FirePayloadOption {
+//  /**
+//   * Toggle based on internal state
+//   */
+//  ToggleRelay  = 0;
+//  /**
+//   * Force enable
+//   */
+//  EnableRelay  = 1;
+//  /**
+//   * Force disable
+//   */
+//  DisableRelay = 2;
+//}
+//
+///**
+// * An available drone connection
+// */
+//message DroneConnection {
+//  /**
+//   * The sys id of the drone that's being connected
+//   */
+//  SysId sysId = 1;
+//  /**
+//   * Mavlink uri for the drone
+//   */
+//  string uri = 2;
+//}
+//
+//message GotoTask {
+//  /**
+//   * The location of the target
+//   */
+//  GeoPoint location = 1;
+//}
+//
+//message LoiterTask {
+//  /**
+//   * The amount of time to loiter in ms
+//   */
+//  uint64 duration = 1;
+//  /**
+//   * The time at which to finish loitering
+//   */
+//  google.protobuf.Timestamp time = 2;
+//  /**
+//   * The base time for time
+//   */
+//  google.protobuf.Timestamp baseTime = 3;
+//  /**
+//   * Rather than the duration or time being relative
+//   * to the last waypoint, the duration or time should
+//   * be relative to the mission upload time.  This
+//   * allows us to build gates for synchronized flying.
+//   */
+//  bool relativeToMissionUpload = 4;
+//}
+//
+//message RTLTask {
+//  /**
+//   * The location of the launch or unset
+//   */
+//  GeoPoint location = 1;
+//}
+//
+//message FirePayloadTask {
+//  /**
+//   * Rather than use the internal controller state, use this to trigger the payload
+//   */
+//  FirePayloadOption option = 1;
+//}
+//
+//message StartMissionTask {
+//}
+//
+//message TakeOffTask {
+//  /**
+//   * The altitude (MSL)
+//   */
+//  float altitude = 1;
+//}
+//
+//message LandTask {
+//}
+//
+///**
+// * Drone task
+// */
+//message Task {
+//  oneof task_type {
+//    RTLTask rtl = 1;
+//    GotoTask goto = 2;
+//    LoiterTask loiter = 3;
+//    FirePayloadTask firePayload = 4;
+//    StartMissionTask startMission = 5;
+//    TakeOffTask takeOff = 6;
+//    LandTask land = 7;
+//  }
+//}
+//
+//enum TaskState {
+//  /**
+//   * Command is valid (is supported and has valid parameters), and was executed.
+//   */
+//  Accepted = 0;
+//  /**
+//   * Command is valid, but cannot be executed at this time. This is used to indicate a problem that should be fixed just by waiting (e.g. a state machine is busy, can't arm because have not got GPS lock, etc.). Retrying later should work.
+//   */
+//  TemporarilyRejected = 1;
+//  /**
+//   * Command is invalid (is supported but has invalid parameters). Retrying same command and parameters will not work.
+//   */
+//  Denied = 2;
+//  /**
+//   * Command is not supported (unknown).
+//   */
+//  Unsupported = 3;
+//  /**
+//   * Command is valid, but execution has failed. This is used to indicate any non-temporary or unexpected problem, i.e. any problem that must be fixed before the command can succeed/be retried. For example, attempting to write a file when out of memory, attempting to arm when sensors are not calibrated, etc.
+//   */
+//  Failed = 4;
+//  /**
+//   * Command is valid and is being executed. This will be followed by further progress updates, i.e. the component may send further COMMAND_ACK messages with result MAV_RESULT_IN_PROGRESS (at a rate decided by the implementation), and must terminate by sending a COMMAND_ACK message with final result of the operation. The COMMAND_ACK.progress field can be used to indicate the progress of the operation.
+//   */
+//  InProgress = 5;
+//  /**
+//   * Command has been cancelled (as a result of receiving a COMMAND_CANCEL message).
+//   */
+//  Cancelled = 6;
+//  /**
+//   * Awaiting ack
+//   */
+//  PendingAck = 7;
+//  /**
+//   * Awaiting fix before command can be executed
+//   */
+//  PendingFix = 8;
+//  /**
+//   * Complete!
+//   */
+//  Complete = 9;
+//}
+//
+///**
+// * Generic progress
+// */
+//message Progress {
+//  /**
+//   * The current progress
+//   */
+//  uint64 progress = 1;
+//  /**
+//   * The max progress (0 for indeterminate, set to progress for completion)
+//   */
+//  uint64 max = 2;
+//}
+//
+///**
+// * Drone mission
+// */
+//message Mission {
+//  /**
+//   * The mission tasks
+//   */
+//  repeated Task tasks = 1;
+//  /**
+//   * The source system of the mission
+//   */
+//  string sourceId = 2;
+//  /**
+//   * A unique id for the mission
+//   */
+//  string id = 3;
+//}
+//
+///**
+// * The mission state
+// */
+//message MissionState {
+//  /**
+//   * The currently executing task id in the mission
+//   */
+//  uint32 taskId = 1;
+//  /**
+//   * The current state of the task
+//   */
+//  TaskState taskState = 2;
+//  /**
+//   * Sync progress
+//   */
+//  Progress syncProgress = 3;
+//}
+//
+//message CameraPayload {
+//  /**
+//   * An rtsp uri string
+//   */
+//  string uri = 1;
+//  /**
+//   * The camera orientation.  A camera mounted upside-down will have a 180 degree orientation
+//   */
+//  float orientation = 2;
+//}
+//
+//message LightAndSoundPayload {
+//}
+//
+//message DronePayload {
+//  oneof drone_payload_type {
+//    CameraPayload camera = 1;
+//    LightAndSoundPayload lightAndSound = 2;
+//  }
+//}
+//
+///**
+// * An available drone full info
+// */
+//message Drone {
+//  /**
+//   * The sys id of the drone
+//   */
+//  SysId sysId = 1;
+//  /**
+//   * Mavlink uri for the drone
+//   */
+//  string uri = 2;
+//  /**
+//   * The state
+//   */
+//  DroneStatus status = 3;
+//  /**
+//   * The current mode
+//   */
+//  DroneMode mode = 10;
+//  /**
+//   * The most recent location
+//   */
+//  GeoReading location = 4;
+//  /**
+//   * The assigned mission
+//   */
+//  Mission mission = 5;
+//  /**
+//   * If a mission is executing, the mission state
+//   */
+//  MissionState missionState = 6;
+//  /**
+//   * Different kinds of payloads
+//   */
+//  DronePayload payload = 7;
+//  /**
+//   * Last time we heard from this drone
+//   */
+//  google.protobuf.Timestamp lastHeardFrom = 8;
+//  /**
+//   * The state of the battery
+//   */
+//  Battery battery = 9;
+//  /**
+//   * The RTL location
+//   */
+//  GeoPoint rtlLocation = 11;
+//}
+//
+///**************************************************************
+//
+// Request/Response/Event payloads
+//
+// **************************************************************/
+//
+///**
+// * Launcher request details
+// */
+//message LauncherRequestType {
+//  oneof launcher_request_type {
+//    /**
+//     * Launch some things from a tube
+//     */
+//    Launch launch = 1;
+//    /**
+//     * Load a drone into a tube
+//     */
+//    Load load = 2;
+//    /**
+//     * Update launcher info
+//     */
+//    Launcher updateLauncher = 3;
+//  }
+//}
+//
+///**
+// * A request to the launcher
+// */
+//message LauncherRequest {
+//  /**
+//   * Request details
+//   */
+//  LauncherRequestType details = 1;
+//}
+//
+///**
+// * Launcher response.  Right now there are no launch details
+// */
+//message LauncherResponse {
+//}
+//
+///**
+// * Launch request
+// */
+//message Launch {
+//  /**
+//   * The tube(s) that should be launched
+//   */
+//  repeated int32 tubeId = 1;
+//  /**
+//   * cancel the launch
+//   */
+//  bool cancel = 2;
+//  /**
+//   * force the launch.  This skips the airspace check.
+//   */
+//  bool force = 3;
+//}
+//
+//
+///**
+// * Load request.  Leaving sys id default will unload the tube
+// */
+//message Load {
+//  /**
+//   * The tube id that should be loaded/unloaded
+//   */
+//  int32 tubeId = 1;
+//  /**
+//   * The sys id that should be loaded into the tube or unset to unload the tube
+//   */
+//  SysId sysId = 2;
+//}
+//
+///**
+// * Launcher state event is fired when launcher state changes
+// */
+//message LauncherStateEvent {
+//  /**
+//   * The set of tubes that changed
+//   */
+//  Launcher launcher = 1;
+//}
+//
+///**
+// * Request to connect a mav proxy to the drone and start sending it's
+// * messages to mqtt.
+// */
+//message DroneConnectRequest {
+//  /**
+//   * Drone to connect to
+//   */
+//  DroneConnection drone = 1;
+//}
+//
+///**
+// * Request to disconnect a mav proxy from a drone.
+// */
+//message DroneDisconnectRequest {
+//  /**
+//   * Drone to disconnect from
+//   */
+//  DroneConnection drone = 1;
+//}
+//
+///**
+// * Response to a DroneConnectRequest
+// */
+//message DroneConnectResponse {
+//}
+//
+///**
+// * Response to a DroneDisConnectRequest
+// */
+//message DroneDisconnectResponse {
+//}
+//
+///**
+// * Drone request details
+// */
+//message DroneRequestType {
+//  oneof drone_request_type {
+//    /**
+//     * Tell the drone to do a task
+//     */
+//    Task task = 1;
+//    /**
+//     * Tell the drone to go into this mode
+//     */
+//    DroneMode setMode = 2;
+//    /**
+//     * The mission
+//     */
+//    Mission setMission = 3;
+//    /**
+//     * The rtl location
+//     */
+//    GeoPoint setRtlLocation = 4;
+//    /**
+//     * Update the drone with this info
+//     */
+//    Drone updateDrone = 5;
+//    /**
+//     * Delete the drone
+//     */
+//    google.protobuf.Empty deleteDrone = 6;
+//    /**
+//     * Get the drone
+//     */
+//    google.protobuf.Empty getDrone = 7;
+//    /**
+//     * Clear the drone's current mission
+//     */
+//    google.protobuf.Empty clearMission = 8;
+//    /**
+//     * Clear the drone's current mission
+//     */
+//    google.protobuf.Empty syncMission = 9;
+//  }
+//}
+//
+///**
+// * Request to tell a drone to do something
+// */
+//message DroneRequest {
+//  /**
+//   * The drone
+//   */
+//  SysId sysId = 1;
+//  /**
+//   * The details
+//   */
+//  DroneRequestType details = 2;
+//}
+//
+//message DroneResponse {
+//  /**
+//   * Drone state after the request
+//   */
+//  Drone drone = 1;
+//}
+//
+///**
+// * Event indicating a proxy is running for a drone.
+// */
+//message DroneConnectEvent {
+//  /**
+//   * Drone that was connected
+//   */
+//  DroneConnection drone = 1;
+//}
+//
+///**
+// * Event indicating a proxy is no longer running for a drone.
+// */
+//message DroneDisconnectEvent {
+//  /**
+//   * Drone that was disconnected
+//   */
+//  DroneConnection drone = 1;
+//}
+//
+///**
+// * Drone state is updated periodically
+// */
+//message DroneStateEvent {
+//  /**
+//   * The set of drones that changed
+//   */
+//  repeated Drone drone = 1;
+//}
+//
+
+enum Button {
+  NULL = 0;
+  A = 0x0130;
+  B = 0x0131;
+  Back = 0x0116;
+  Base = 0x0126;
+  Base2 = 0x0127;
+  Base3 = 0x0128;
+  Base4 = 0x0129;
+  Base5 = 0x012A;
+  Base6 = 0x012B;
+  C = 0x0132;
+  Dead = 0x012F;
+  Digi = 0x0140;
+  DpadDown = 0x0221;
+  DpadLeft = 0x0222;
+  DpadRight = 0x0223;
+  DpadUp = 0x0220;
+  Extra = 0x0114;
+  Forward = 0x0115;
+  GearDown = 0x0150;
+  GearUp = 0x0151;
+  Joystick = 0x0120;
+  Left = 0x0110;
+  Middle = 0x0112;
+  Misc = 0x0100;
+  Mode = 0x013C;
+  N1 = 0x0101;
+  N2 = 0x0102;
+  N3 = 0x0103;
+  N4 = 0x0104;
+  N5 = 0x0105;
+  N6 = 0x0106;
+  N7 = 0x0107;
+  N8 = 0x0108;
+  N9 = 0x0109;
+  North = 0x0133;
+  Pinkie = 0x0125;
+  Right = 0x0111;
+  Select = 0x013A;
+  Side = 0x0113;
+  Start = 0x013B;
+  Stylus = 0x014B;
+  Stylus2 = 0x014C;
+  Stylus3 = 0x0149;
+  Task = 0x0117;
+  Thumb = 0x0121;
+  Thumb2 = 0x0122;
+  Thumbl = 0x013D;
+  Thumbr = 0x013E;
+  Tl = 0x0136;
+  Tl2 = 0x0138;
+  ToolAirbrush = 0x0144;
+  ToolBrush = 0x0142;
+  ToolDoubletap = 0x014D;
+  ToolFinger = 0x0145;
+  ToolLens = 0x0147;
+  ToolMouse = 0x0146;
+  ToolPencil = 0x0143;
+  ToolQuadtap = 0x014F;
+  ToolQuinttap = 0x0148;
+  ToolRubber = 0x0141;
+  ToolTripletap = 0x014E;
+  Top = 0x0123;
+  Top2 = 0x0124;
+  Touch = 0x014A;
+  Tr = 0x0137;
+  Tr2 = 0x0139;
+  TriggerHappy = 0x02C0;
+  TriggerHappy10 = 0x02C9;
+  TriggerHappy11 = 0x02CA;
+  TriggerHappy12 = 0x02CB;
+  TriggerHappy13 = 0x02CC;
+  TriggerHappy14 = 0x02CD;
+  TriggerHappy15 = 0x02CE;
+  TriggerHappy16 = 0x02CF;
+  TriggerHappy17 = 0x02D0;
+  TriggerHappy18 = 0x02D1;
+  TriggerHappy19 = 0x02D2;
+  TriggerHappy2 = 0x02C1;
+  TriggerHappy20 = 0x02D3;
+  TriggerHappy21 = 0x02D4;
+  TriggerHappy22 = 0x02D5;
+  TriggerHappy23 = 0x02D6;
+  TriggerHappy24 = 0x02D7;
+  TriggerHappy25 = 0x02D8;
+  TriggerHappy26 = 0x02D9;
+  TriggerHappy27 = 0x02DA;
+  TriggerHappy28 = 0x02DB;
+  TriggerHappy29 = 0x02DC;
+  TriggerHappy3 = 0x02C2;
+  TriggerHappy30 = 0x02DD;
+  TriggerHappy31 = 0x02DE;
+  TriggerHappy32 = 0x02DF;
+  TriggerHappy33 = 0x02E0;
+  TriggerHappy34 = 0x02E1;
+  TriggerHappy35 = 0x02E2;
+  TriggerHappy36 = 0x02E3;
+  TriggerHappy37 = 0x02E4;
+  TriggerHappy38 = 0x02E5;
+  TriggerHappy39 = 0x02E6;
+  TriggerHappy4 = 0x02C3;
+  TriggerHappy40 = 0x02E7;
+  TriggerHappy5 = 0x02C4;
+  TriggerHappy6 = 0x02C5;
+  TriggerHappy7 = 0x02C6;
+  TriggerHappy8 = 0x02C7;
+  TriggerHappy9 = 0x02C8;
+  West = 0x0134;
+  Z = 0x0135;
+}
+
+enum Key {
+  KeyNull = 0;
+  KeyA = 0x001E;
+  Ab = 0x0196;
+  AddressBook = 0x01AD;
+  Again = 0x0081;
+  AlsToggle = 0x0230;
+  AltErase = 0x00DE;
+  Angle = 0x0173;
+  Apostrophe = 0x0028;
+  Appselect = 0x0244;
+  Archive = 0x0169;
+  AspectRatio = 0x0177;
+  Assistant = 0x0247;
+  AttendantOff = 0x021C;
+  AttendantOn = 0x021B;
+  AttendantToggle = 0x021D;
+  Audio = 0x0188;
+  AudioDesc = 0x026E;
+  Aux = 0x0186;
+  KeyB = 0x0030;
+  KeyBack = 0x009E;
+  Backslash = 0x002B;
+  Backspace = 0x000E;
+  BassBoost = 0x00D1;
+  Battery = 0x00EC;
+  Blue = 0x0191;
+  Bluetooth = 0x00ED;
+  Bookmarks = 0x009C;
+  Break = 0x019B;
+  BrightnessAuto = 0x00F4;
+  BrightnessCycle = 0x00F3;
+  BrightnessMax = 0x0251;
+  BrightnessMin = 0x0250;
+  BrightnessToggle = 0x01AF;
+  BrightnessDown = 0x00E0;
+  BrightnessUp = 0x00E1;
+  BrlDot1 = 0x01F1;
+  BrlDot10 = 0x01FA;
+  BrlDot2 = 0x01F2;
+  BrlDot3 = 0x01F3;
+  BrlDot4 = 0x01F4;
+  BrlDot5 = 0x01F5;
+  BrlDot6 = 0x01F6;
+  BrlDot7 = 0x01F7;
+  BrlDot8 = 0x01F8;
+  BrlDot9 = 0x01F9;
+  ButtonConfig = 0x0240;
+  KeyC = 0x002E;
+  Calc = 0x008C;
+  Calendar = 0x018D;
+  Camera = 0x00D4;
+  CameraDown = 0x0218;
+  CameraFocus = 0x0210;
+  CameraLeft = 0x0219;
+  CameraRight = 0x021A;
+  CameraUp = 0x0217;
+  CameraZoomIn = 0x0215;
+  CameraZoomOut = 0x0216;
+  Cancel = 0x00DF;
+  CapsLock = 0x003A;
+  Cd = 0x017F;
+  Channel = 0x016B;
+  ChannelDown = 0x0193;
+  ChannelUp = 0x0192;
+  Chat = 0x00D8;
+  Clear = 0x0163;
+  Close = 0x00CE;
+  CloseCd = 0x00A0;
+  Coffee = 0x0098;
+  Comma = 0x0033;
+  Compose = 0x007F;
+  Computer = 0x009D;
+  Config = 0x00AB;
+  Connect = 0x00DA;
+  ContextMenu = 0x01B6;
+  Controlpanel = 0x0243;
+  Copy = 0x0085;
+  Cut = 0x0089;
+  CycleWindows = 0x009A;
+  D = 0x0020;
+  Dashboard = 0x00CC;
+  Data = 0x0277;
+  Database = 0x01AA;
+  DelEol = 0x01C0;
+  DelEos = 0x01C1;
+  DelLine = 0x01C3;
+  Delete = 0x006F;
+  DeleteFile = 0x0092;
+  Digits = 0x019D;
+  Direction = 0x0099;
+  Directory = 0x018A;
+  DisplayOff = 0x00F5;
+  Documents = 0x00EB;
+  Dollar = 0x01B2;
+  Dot = 0x0034;
+  Down = 0x006C;
+  Dvd = 0x0185;
+  E = 0x0012;
+  Edit = 0x00B0;
+  Editor = 0x01A6;
+  EjectCd = 0x00A1;
+  EjectCloseCd = 0x00A2;
+  Email = 0x00D7;
+  End = 0x006B;
+  Enter = 0x001C;
+  Epg = 0x016D;
+  Equal = 0x000D;
+  Esc = 0x0001;
+  Euro = 0x01B3;
+  Exit = 0x00AE;
+  F = 0x0021;
+  F1 = 0x003B;
+  F10 = 0x0044;
+  F11 = 0x0057;
+  F12 = 0x0058;
+  F13 = 0x00B7;
+  F14 = 0x00B8;
+  F15 = 0x00B9;
+  F16 = 0x00BA;
+  F17 = 0x00BB;
+  F18 = 0x00BC;
+  F19 = 0x00BD;
+  F2 = 0x003C;
+  F20 = 0x00BE;
+  F21 = 0x00BF;
+  F22 = 0x00C0;
+  F23 = 0x00C1;
+  F24 = 0x00C2;
+  F3 = 0x003D;
+  F4 = 0x003E;
+  F5 = 0x003F;
+  F6 = 0x0040;
+  F7 = 0x0041;
+  F8 = 0x0042;
+  F9 = 0x0043;
+  FastForward = 0x00D0;
+  FastReverse = 0x0275;
+  Favorites = 0x016C;
+  File = 0x0090;
+  Finance = 0x00DB;
+  Find = 0x0088;
+  First = 0x0194;
+  Fn = 0x01D0;
+  Fn1 = 0x01DE;
+  Fn2 = 0x01DF;
+  FnB = 0x01E4;
+  FnD = 0x01E0;
+  FnE = 0x01E1;
+  FnEsc = 0x01D1;
+  FnF = 0x01E2;
+  FnF1 = 0x01D2;
+  FnF10 = 0x01DB;
+  FnF11 = 0x01DC;
+  FnF12 = 0x01DD;
+  FnF2 = 0x01D3;
+  FnF3 = 0x01D4;
+  FnF4 = 0x01D5;
+  FnF5 = 0x01D6;
+  FnF6 = 0x01D7;
+  FnF7 = 0x01D8;
+  FnF8 = 0x01D9;
+  FnF9 = 0x01DA;
+  FnS = 0x01E3;
+  KeyForward = 0x009F;
+  ForwardMail = 0x00E9;
+  Frameback = 0x01B4;
+  FrameForward = 0x01B5;
+  Front = 0x0084;
+  FullScreen = 0x0174;
+  G = 0x0022;
+  Games = 0x01A1;
+  Goto = 0x0162;
+  GraphicsEditor = 0x01A8;
+  Grave = 0x0029;
+  Green = 0x018F;
+  H = 0x0023;
+  Hangeul = 0x007A;
+  Hanja = 0x007B;
+  Help = 0x008A;
+  Henkan = 0x005C;
+  Hiragana = 0x005B;
+  Home = 0x0066;
+  Homepage = 0x00AC;
+  Hp = 0x00D3;
+  I = 0x0017;
+  Images = 0x01BA;
+  Info = 0x0166;
+  InsLine = 0x01C2;
+  Insert = 0x006E;
+  Iso = 0x00AA;
+  J = 0x0024;
+  Journal = 0x0242;
+  K = 0x0025;
+  Katakana = 0x005A;
+  KatakanaHiragana = 0x005D;
+  KbdLayoutNext = 0x0248;
+  KbdLcdMenu1 = 0x02B8;
+  KbdLcdMenu2 = 0x02B9;
+  KbdLcdMenu3 = 0x02BA;
+  KbdLcdMenu4 = 0x02BB;
+  KbdLcdMenu5 = 0x02BC;
+  KbdIllumDown = 0x00E5;
+  KbdIllumToggle = 0x00E4;
+  KbdIllumUp = 0x00E6;
+  KbdInputAssistAccept = 0x0264;
+  KbdInputAssistCancel = 0x0265;
+  KbdInputAssistNext = 0x0261;
+  KbdInputAssistNextgroup = 0x0263;
+  KbdInputAssistPrev = 0x0260;
+  KbdInputAssistPrevgroup = 0x0262;
+  Keyboard = 0x0176;
+  Kp0 = 0x0052;
+  Kp1 = 0x004F;
+  Kp2 = 0x0050;
+  Kp3 = 0x0051;
+  Kp4 = 0x004B;
+  Kp5 = 0x004C;
+  Kp6 = 0x004D;
+  Kp7 = 0x0047;
+  Kp8 = 0x0048;
+  Kp9 = 0x0049;
+  KpAsterisk = 0x0037;
+  KpComma = 0x0079;
+  KpDott = 0x0053;
+  KpEnter = 0x0060;
+  KpEqual = 0x0075;
+  KpJpComma = 0x005F;
+  KpLeftParen = 0x00B3;
+  KpMinus = 0x004A;
+  KpPlus = 0x004E;
+  KpPlusMinus = 0x0076;
+  KpRightParen = 0x00B4;
+  KpSlash = 0x0062;
+  L = 0x0026;
+  Language = 0x0170;
+  Last = 0x0195;
+  KeyLeft = 0x0069;
+  LeftDown = 0x0269;
+  LeftUp = 0x0268;
+  LeftAlt = 0x0038;
+  LeftBrace = 0x001A;
+  LeftCtrl = 0x001D;
+  LeftMeta = 0x007D;
+  LeftShift = 0x002A;
+  LightsToggle = 0x021E;
+  LineFeed = 0x0065;
+  List = 0x018B;
+  LogOff = 0x01B1;
+  M = 0x0032;
+  Macro = 0x0070;
+  Macro1 = 0x0290;
+  Macro10 = 0x0299;
+  Macro11 = 0x029A;
+  Macro12 = 0x029B;
+  Macro13 = 0x029C;
+  Macro14 = 0x029D;
+  Macro15 = 0x029E;
+  Macro16 = 0x029F;
+  Macro17 = 0x02A0;
+  Macro18 = 0x02A1;
+  Macro19 = 0x02A2;
+  Macro2 = 0x0291;
+  Macro20 = 0x02A3;
+  Macro21 = 0x02A4;
+  Macro22 = 0x02A5;
+  Macro23 = 0x02A6;
+  Macro24 = 0x02A7;
+  Macro25 = 0x02A8;
+  Macro26 = 0x02A9;
+  Macro27 = 0x02AA;
+  Macro28 = 0x02AB;
+  Macro29 = 0x02AC;
+  Macro3 = 0x0292;
+  Macro30 = 0x02AD;
+  Macro4 = 0x0293;
+  Macro5 = 0x0294;
+  Macro6 = 0x0295;
+  Macro7 = 0x0296;
+  Macro8 = 0x0297;
+  Macro9 = 0x0298;
+  MacroPreset1 = 0x02B3;
+  MacroPreset2 = 0x02B4;
+  MacroPreset3 = 0x02B5;
+  MacroPresetCycle = 0x02B2;
+  MacroRecordStart = 0x02B0;
+  MacroRecordStop = 0x02B1;
+  Mail = 0x009B;
+  Media = 0x00E2;
+  MediaRepeat = 0x01B7;
+  MediaTopMenu = 0x026B;
+  Memo = 0x018C;
+  Menu = 0x008B;
+  Messenger = 0x01AE;
+  Mhp = 0x016F;
+  MicMute = 0x00F8;
+  Minus = 0x000C;
+  KeyMode = 0x0175;
+  Move = 0x00AF;
+  Mp3 = 0x0187;
+  MsDos = 0x0097;
+  Muhenkan = 0x005E;
+  Mute = 0x0071;
+  N = 0x0031;
+  N0 = 0x000B;
+  KeyN1 = 0x0002;
+  N102nd = 0x0056;
+  N10ChannelsDown = 0x01B9;
+  N10ChannelsUp = 0x01B8;
+  KeyN2 = 0x0003;
+  KeyN3 = 0x0004;
+  N3dMode = 0x026F;
+  KeyN4 = 0x0005;
+  KeyN5 = 0x0006;
+  KeyN6 = 0x0007;
+  KeyN7 = 0x0008;
+  KeyN8 = 0x0009;
+  KeyN9 = 0x000A;
+  New = 0x00B5;
+  News = 0x01AB;
+  Next = 0x0197;
+  NextFavorite = 0x0270;
+  NextSong = 0x00A3;
+  Numeric0 = 0x0200;
+  Numeric1 = 0x0201;
+  Numeric11 = 0x026C;
+  Numeric12 = 0x026D;
+  Numeric2 = 0x0202;
+  Numeric3 = 0x0203;
+  Numeric4 = 0x0204;
+  Numeric5 = 0x0205;
+  Numeric6 = 0x0206;
+  Numeric7 = 0x0207;
+  Numeric8 = 0x0208;
+  Numeric9 = 0x0209;
+  NumericA = 0x020C;
+  NumericB = 0x020D;
+  NumericC = 0x020E;
+  NumericD = 0x020F;
+  NumericPound = 0x020B;
+  NumericStar = 0x020A;
+  NumLock = 0x0045;
+  O = 0x0018;
+  Ok = 0x0160;
+  OnscreenKeyboard = 0x0278;
+  Open = 0x0086;
+  Option = 0x0165;
+  P = 0x0019;
+  PageDown = 0x006D;
+  PageUp = 0x0068;
+  Paste = 0x0087;
+  Pause = 0x0077;
+  PauseRecord = 0x0272;
+  PauseCd = 0x00C9;
+  Pc = 0x0178;
+  Phone = 0x00A9;
+  Play = 0x00CF;
+  PlayCd = 0x00C8;
+  Player = 0x0183;
+  PlayPause = 0x00A4;
+  Power = 0x0074;
+  Power2 = 0x0164;
+  Presentation = 0x01A9;
+  Previous = 0x019C;
+  PreviousSong = 0x00A5;
+  Print = 0x00D2;
+  PrivacyScreenToggle = 0x0279;
+  Prog1 = 0x0094;
+  Prog2 = 0x0095;
+  Prog3 = 0x00CA;
+  Prog4 = 0x00CB;
+  Program = 0x016A;
+  Props = 0x0082;
+  Pvr = 0x016E;
+  Q = 0x0010;
+  Question = 0x00D6;
+  R = 0x0013;
+  Radio = 0x0181;
+  Record = 0x00A7;
+  Red = 0x018E;
+  Redo = 0x00B6;
+  Refresh = 0x00AD;
+  Reply = 0x00E8;
+  Restart = 0x0198;
+  Rewind = 0x00A8;
+  RfKill = 0x00F7;
+  KeyRight = 0x006A;
+  RightDown = 0x0267;
+  RightUp = 0x0266;
+  RightAlt = 0x0064;
+  RightBrace = 0x001B;
+  RightCtrl = 0x0061;
+  RightMeta = 0x007E;
+  RightShift = 0x0036;
+  Ro = 0x0059;
+  RootMenu = 0x026A;
+  RotateLockToggle = 0x0231;
+  S = 0x001F;
+  Sat = 0x017D;
+  Sat2 = 0x017E;
+  Save = 0x00EA;
+  Scale = 0x0078;
+  Screensaver = 0x0245;
+  ScrollDown = 0x00B2;
+  ScrollLock = 0x0046;
+  ScrollUp = 0x00B1;
+  Search = 0x00D9;
+  KeySelect = 0x0161;
+  SelectiveScreenshot = 0x027A;
+  Semicolon = 0x0027;
+  Send = 0x00E7;
+  SendFile = 0x0091;
+  Setup = 0x008D;
+  Shop = 0x00DD;
+  Shuffle = 0x019A;
+  Slash = 0x0035;
+  Sleep = 0x008E;
+  Slow = 0x0199;
+  SlowReverse = 0x0276;
+  Sound = 0x00D5;
+  Space = 0x0039;
+  Spellcheck = 0x01B0;
+  Sport = 0x00DC;
+  Spreadsheet = 0x01A7;
+  Stop = 0x0080;
+  StopRecord = 0x0271;
+  StopCd = 0x00A6;
+  Subtitle = 0x0172;
+  Suspend = 0x00CD;
+  SwitchVideoMode = 0x00E3;
+  SysRq = 0x0063;
+  T = 0x0014;
+  Tab = 0x000F;
+  Tape = 0x0180;
+  TaskManager = 0x0241;
+  Teen = 0x019E;
+  Text = 0x0184;
+  Time = 0x0167;
+  Title = 0x0171;
+  TouchpadOff = 0x0214;
+  TouchpadOn = 0x0213;
+  TouchpadToggle = 0x0212;
+  Tuner = 0x0182;
+  Tv = 0x0179;
+  Tv2 = 0x017A;
+  Twen = 0x019F;
+  U = 0x0016;
+  Undo = 0x0083;
+  Unknown = 0x00F0;
+  Unmute = 0x0274;
+  Up = 0x0067;
+  Uwb = 0x00EF;
+  V = 0x002F;
+  Vcr = 0x017B;
+  Vcr2 = 0x017C;
+  Vendor = 0x0168;
+  Video = 0x0189;
+  VideoNext = 0x00F1;
+  VideoPrev = 0x00F2;
+  VideoPhone = 0x01A0;
+  Vod = 0x0273;
+  VoiceCommand = 0x0246;
+  VoiceMail = 0x01AC;
+  VolumeDown = 0x0072;
+  VolumeUp = 0x0073;
+  W = 0x0011;
+  WakeUp = 0x008F;
+  Wimax = 0x00F6;
+  Wlan = 0x00EE;
+  WordProcessor = 0x01A5;
+  WpsButton = 0x0211;
+  Www = 0x0096;
+  X = 0x002D;
+  Xfer = 0x0093;
+  Y = 0x0015;
+  Yellow = 0x0190;
+  Yen = 0x007C;
+  KeyZ = 0x002C;
+  ZenkakuHankaku = 0x0055;
+  ZoomIn = 0x01A2;
+  ZoomOut = 0x01A3;
+  ZoomReset = 0x01A4;
+}
+
+message MouseMoveEvent {
+  int32 delta = 1;
+}
+
+message ButtonEvent {
+  Button button = 1;
+  bool down = 2;
+}
+
+message KeyEvent {
+  Key key = 1;
+  bool down = 2;
+}
+
+message InputEvent {
+  oneof input_event_type {
+    KeyEvent key = 1;
+    ButtonEvent button = 2;
+    MouseMoveEvent wheel = 3;
+    MouseMoveEvent x = 4;
+    MouseMoveEvent y = 5;
+  }
+}
+
+message ClipboardEvent {
+  bytes data = 1;
+  string mimeType = 2;
+}
+
+message NotifyEvent {
+  string text = 1;
+}
+
+message PingEvent {
+  /**
+   * True if the commander is the source of this message
+   */
+  bool commander = 1;
+}
+
+message ActiveNodeChangedEvent {
+  /**
+   * The name of the new active node
+   */
+  string name = 1;
+}
+
+/**************************************************************
+
+ Messaging structs
+
+ **************************************************************/
+
+/**
+ * A message.  This is the envelope inside of which data is transmitted.
+ * There are lots of benefits to structuring messages this way.  This allows
+ * for generic handling of base messaging features and ensures DRY.  This
+ * also allows simple serialization and deserialization of streams of messages.
+ * If _everything_ is a message we always know what to read.
+ */
+message Message {
+  /**
+   * Message header
+   */
+  Header header = 1;
+  /**
+   * Types of message payloads supported.  There's really 2 ways to do this.  This way,
+   * which is generally cleaner and simpler to use and should be preferred given the types
+   * of payloads are fairly constant.  The other way is to use protobuf's Any type which
+   * is way more generic but way more complicated.
+   */
+  oneof payload {
+    google.protobuf.Empty empty = 10;
+    ClipboardEvent clipboardEvent = 11;
+    InputEvent inputEvent = 12;
+    NotifyEvent notifyEvent = 13;
+    PingEvent pingEvent = 14;
+    ActiveNodeChangedEvent activeNodeChangedEvent = 15;
+  }
+}
+
+/**
+ * A message header.  This contains all information about identification and
+ * direction of messages needed for service to properly and generically support
+ * Event/Request/Response comms.
+ */
+message Header {
+  /**
+   * A unique id for a message.  This is required for Request messages as it
+   * is used for response correlation.  It is optional for all other types of
+   * messages but is nice for debugging.
+   */
+  string id = 1;
+  /**
+   * An identifier for the sending service/entity.  This is required for Request messages
+   * as it is used for response correlation.  At some point this should be auth'd.
+   */
+  string fromId = 2;
+  /**
+   * An identifier for the receiving entity.  This is needed for direct requests and events.
+   * If a request is for "whoever can deal with it", this may be left unset.
+   */
+  string toId = 3;
+  /**
+   * Send timestamp for the message.  Required for messages that have QoS requirements.
+   */
+  google.protobuf.Timestamp time = 4;
+  /**
+   * Specific header information
+   */
+  oneof header_type {
+    EventHeader event = 10;
+    RequestHeader request = 11;
+    ResponseHeader response = 12;
+  }
+}
+
+/**
+ * Response codes.  These should be expanded to include more specific things
+ */
+enum ResponseCode {
+  /**
+   * The request was successful
+   */
+  OK = 0;
+  /**
+   * The request failed generically
+   */
+  ERROR = 1;
+  /**
+   * The response is an update.  This may be used to implement long running requests.
+   */
+  UPDATE = 2;
+}
+
+/**
+ * Event header data.  It's possible that this could contain a sequence number
+ * so that clients could react or nak generally.  Doesn't really seem necessary
+ * right now.
+ */
+message EventHeader {
+}
+
+/**
+ * Request header data
+ */
+message RequestHeader {
+  /**
+   * Set to true to cancel the request described in the header
+   */
+  bool cancel = 1;
+}
+
+/**
+ * Response header can generically describe request success and failure.  This
+ * also contains the requestId for request correlation.  The requestId will match
+ * the id in the Header of the request message.  Any response details may be added
+ * as a specific payload_type.
+ */
+message ResponseHeader {
+  /**
+   * Response code
+   */
+  ResponseCode code = 1;
+  /**
+   * An optional message
+   */
+  string message = 2;
+  /**
+   * The request id.  This is required
+   */
+  string requestId = 3;
+}

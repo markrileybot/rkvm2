@@ -16,7 +16,7 @@ fn main() -> Result<()> {
         env!("CARGO_MANIFEST_DIR"),
     );
     println!(
-        "cargo:rustc-env=DTX_PROTO_VERSION_STRING={}",
+        "cargo:rustc-env=RKVM2_PROTO_VERSION_STRING={}",
         version_string
     );
 
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
         .extern_path(".google.protobuf.Value", "::prost_wkt_types::Value")
         .file_descriptor_set_path(&descriptor_file)
-        .compile_protos(&["src/messages.proto"], &["src/"])?;
+        .compile_protos(&["src/rkvm2.proto"], &["src/"])?;
 
     let descriptor_bytes = std::fs::read(descriptor_file).unwrap();
 

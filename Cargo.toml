@@ -1,2 +1,2 @@
 [workspace]
-members = ["proto"]
+members = ["proto","input","inputd","rkvm2"]
