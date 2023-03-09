@@ -297,15 +297,21 @@ impl App {
             }
         }
 
-        let active_node = self.nodes.get(self.active_node).unwrap();
-        if active_node.local {
+        if let Some(active_node) = self.nodes.get(self.active_node) {
+            if active_node.local {
+                self.send_to_input(message);
+                return;
+            }
+
+            let my_node = self.nodes.get(0).unwrap();
+            if my_node.commander {
+                self.send_to_net(message, active_node.name.as_str())
+            }
+        } else {
+            // we couldn't find the active node.  Could have expired and we haven't switched
+            // back to the commander yet.
             self.send_to_input(message);
             return;
-        }
-
-        let my_node = self.nodes.get(0).unwrap();
-        if my_node.commander {
-            self.send_to_net(message, active_node.name.as_str())
         }
     }
 
@@ -348,13 +354,26 @@ impl App {
             }
         } else {
             let now = Instant::now();
-            self.nodes.retain(|n| {
-                if n.expired(now) {
-                    log::info!("Expiring {}", n.name);
-                    return false;
+            for (index, node) in self.nodes.iter().enumerate() {
+                if node.expired(now) {
+                    log::info!("Expiring {}", node.name);
+
+                    if self.active_node == index {
+                        if let Some(commander_name) = self.nodes.iter()
+                            .find(|n| n.commander)
+                            .map(|n| n.name.clone()) {
+
+                            self.send_to_loopback(Message {
+                                header: None,
+                                payload: Some(Payload::ActiveNodeChangedEvent(ActiveNodeChangedEvent {
+                                    name: commander_name,
+                                })),
+                            });
+                        }
+                    }
                 }
-                return true;
-            });
+            }
+            self.nodes.retain(|n| !n.expired(now));
 
             let my_node = self.nodes.get(0).unwrap();
             self.send_to_net(Message {
