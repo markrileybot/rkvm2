@@ -7,16 +7,17 @@ use itertools::Itertools;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::sleep;
 
+use rkvm2_config::Config;
 use rkvm2_proto::{ActiveNodeChangedEvent, ClipboardEvent, Header, Message, PingEvent};
 use rkvm2_proto::input_event::InputEventType;
 use rkvm2_proto::message::Payload;
 
-use crate::net::Distributor;
 use crate::input::InputClient;
+use crate::net::Distributor;
 
+mod conn;
 mod input;
 mod net;
-mod conn;
 
 trait Action: Send {
     fn act(&self, app: &App);
@@ -29,7 +30,9 @@ impl Action for ActiveNodeChangeAction {
             let name = next_node.name.clone();
             app.send_to_loopback(Message {
                 header: None,
-                payload: Some(Payload::ActiveNodeChangedEvent(ActiveNodeChangedEvent {name})),
+                payload: Some(Payload::ActiveNodeChangedEvent(ActiveNodeChangedEvent {
+                    name,
+                })),
             });
         }
     }
@@ -51,11 +54,13 @@ struct Node {
     commander: bool,
     local: bool,
     name: String,
-    last_heard_from: Instant
+    last_heard_from: Instant,
 }
 impl Node {
     fn expired(&self, now: Instant) -> bool {
-        return !self.commander && !self.local && now.duration_since(self.last_heard_from) > Duration::from_secs(3);
+        return !self.commander
+            && !self.local
+            && now.duration_since(self.last_heard_from) > Duration::from_secs(3);
     }
 }
 
@@ -73,14 +78,14 @@ impl App {
     async fn run(name: String, broadcast_address: String) {
         let (message_sender, mut message_receiver) = unbounded_channel();
         let input_sender = InputClient::open(message_sender.clone());
-        let net_sender  = Distributor::open(broadcast_address, message_sender.clone());
+        let net_sender = Distributor::open(broadcast_address, message_sender.clone());
         let ping_sender = message_sender.clone();
 
         let my_node = Node {
             commander: false,
             local: true,
             name,
-            last_heard_from: Instant::now()
+            last_heard_from: Instant::now(),
         };
 
         let mut app = Self {
@@ -90,7 +95,7 @@ impl App {
             key_bindings: Default::default(),
             input_sender,
             net_sender,
-            message_sender
+            message_sender,
         };
 
         tokio::spawn(async move {
@@ -144,7 +149,10 @@ impl App {
         let mut recv_source = "";
 
         match &message {
-            Message { header: maybe_header, payload: Some(payload) } => {
+            Message {
+                header: maybe_header,
+                payload: Some(payload),
+            } => {
                 match maybe_header {
                     None => {
                         // internal messages that want to be sent out have no header
@@ -158,7 +166,7 @@ impl App {
                             return;
                         }
                         // external messages that aren't for me
-                        if !header.to_id.is_empty() && header.to_id != my_node.name  {
+                        if !header.to_id.is_empty() && header.to_id != my_node.name {
                             return;
                         }
 
@@ -174,7 +182,9 @@ impl App {
                             let my_node = self.nodes.get(0).unwrap();
                             message = Message {
                                 header: None,
-                                payload: Some(Payload::PingEvent(PingEvent { commander: my_node.commander })),
+                                payload: Some(Payload::PingEvent(PingEvent {
+                                    commander: my_node.commander,
+                                })),
                             };
 
                             let now = Instant::now();
@@ -186,7 +196,9 @@ impl App {
                                 return true;
                             });
                         } else {
-                            if let Some(node) = self.nodes.iter_mut().find(|n| n.name == recv_source) {
+                            if let Some(node) =
+                                self.nodes.iter_mut().find(|n| n.name == recv_source)
+                            {
                                 node.last_heard_from = Instant::now();
                                 node.commander = ping.commander;
                             } else {
@@ -200,9 +212,7 @@ impl App {
                             return;
                         }
                     }
-                    Payload::ClipboardEvent(_) => {
-
-                    }
+                    Payload::ClipboardEvent(_) => {}
                     Payload::InputEvent(e) => {
                         let my_node = self.nodes.get_mut(0).unwrap();
 
@@ -213,7 +223,7 @@ impl App {
                             if let Some(InputEventType::Key(key_event)) = &e.input_event_type {
                                 let changed = match key_event.down {
                                     true => self.keys.insert(key_event.key),
-                                    false => self.keys.remove(&key_event.key)
+                                    false => self.keys.remove(&key_event.key),
                                 };
 
                                 if changed {
@@ -237,12 +247,20 @@ impl App {
 
                         if active_node.name == my_node.name {
                             // if I'm about to be switched, send my clip contents
-                            self.send_to_net(Message {
-                                header: None,
-                                payload: Some(Payload::ClipboardEvent(ClipboardEvent { data: vec![], mime_type: "".to_string() })),
-                            }, "")
+                            self.send_to_net(
+                                Message {
+                                    header: None,
+                                    payload: Some(Payload::ClipboardEvent(ClipboardEvent {
+                                        data: vec![],
+                                        mime_type: "".to_string(),
+                                    })),
+                                },
+                                "",
+                            )
                         }
-                        if let Some((new_active_node, _)) = self.nodes.iter().find_position(|n| n.name == e.name) {
+                        if let Some((new_active_node, _)) =
+                            self.nodes.iter().find_position(|n| n.name == e.name)
+                        {
                             // switch the active node
                             self.active_node = new_active_node;
                         }
@@ -261,5 +279,10 @@ impl App {
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    App::run(hostname::get().unwrap().into_string().unwrap(), "192.168.24.255:54361".to_string()).await;
+    let config = Config::read();
+    App::run(
+        hostname::get().unwrap().into_string().unwrap(),
+        config.broadcast_address,
+    )
+    .await;
 }

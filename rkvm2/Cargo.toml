@@ -12,6 +12,8 @@ log = "0.4.11"
 tokio-util = { version="0.7.7", features=["codec","net"] }
 rkvm2-input = { path = "../input" }
 rkvm2-proto = { path = "../proto" }
+rkvm2-pipe = { path = "../pipe" }
+rkvm2-config = { path = "../config" }
 async-trait = "0.1.66"
 itertools = "0.10.5"
 hostname = "0.3.1"

@@ -11,13 +11,13 @@ use prost::bytes::BytesMut;
 use prost::{DecodeError, Message as ProstMessage};
 use tokio_util::codec::{Decoder, Encoder};
 
-pub const RKVM2_PROTO_VERSION_STRING: &str = env!("RKVM2_PROTO_VERSION_STRING");
+pub const PROTO_VERSION_STRING: &str = env!("RKVM2_PROTO_VERSION_STRING");
 
 include!(concat!(env!("OUT_DIR"), "/rkvm2.proto.rs"));
 
 #[derive(Default)]
 pub struct MessageCodec<T: ProstMessage> {
-    _marker: PhantomData<T>
+    _marker: PhantomData<T>,
 }
 
 impl MessageCodec<Message> {
@@ -26,7 +26,7 @@ impl MessageCodec<Message> {
     }
 }
 
-impl <T: ProstMessage + Default> Decoder for MessageCodec<T> {
+impl<T: ProstMessage + Default> Decoder for MessageCodec<T> {
     type Item = T;
     type Error = io::Error;
 
@@ -34,12 +34,12 @@ impl <T: ProstMessage + Default> Decoder for MessageCodec<T> {
         let message: Result<T, DecodeError> = ProstMessage::decode_length_delimited(src);
         return match message {
             Ok(t) => Ok(Some(t)),
-            Err(e) => Ok(None)
+            Err(_e) => Ok(None),
         };
     }
 }
 
-impl <T: ProstMessage> Encoder<T> for MessageCodec<T> {
+impl<T: ProstMessage> Encoder<T> for MessageCodec<T> {
     type Error = io::Error;
 
     fn encode(&mut self, item: T, dst: &mut BytesMut) -> Result<(), Self::Error> {

@@ -17,7 +17,8 @@ impl EventWriter {
     pub async fn new() -> Result<Self, Error> {
         tokio::task::spawn_blocking(|| -> Result<Self, Error> {
             return Self::new_sync();
-        }).await?
+        })
+        .await?
     }
 
     fn new_sync() -> Result<Self, Error> {
@@ -45,8 +46,10 @@ impl EventWriter {
 
         if ret < 0 {
             unsafe { glue::libevdev_free(evdev) };
-            return Err(Error::new(Error::from_raw_os_error(-ret).kind(),
-                                  format!("Failed to create from device ({})", ret)));
+            return Err(Error::new(
+                Error::from_raw_os_error(-ret).kind(),
+                format!("Failed to create from device ({})", ret),
+            ));
         }
 
         let uinput = unsafe { uinput.assume_init() };
@@ -113,15 +116,22 @@ unsafe fn setup_evdev(evdev: *mut libevdev) -> Result<(), Error> {
     for (r#type, codes) in TYPES.iter().copied() {
         let ret = glue::libevdev_enable_event_type(evdev, r#type);
         if ret < 0 {
-            return Err(Error::new(Error::from_raw_os_error(-ret).kind(),
-                                  format!("Failed to enable event type {} ({})", r#type, ret)));
+            return Err(Error::new(
+                Error::from_raw_os_error(-ret).kind(),
+                format!("Failed to enable event type {} ({})", r#type, ret),
+            ));
         }
 
         for code in codes.iter().cloned().flatten() {
             let ret = glue::libevdev_enable_event_code(evdev, r#type, code, std::ptr::null_mut());
             if ret < 0 {
-                return Err(Error::new(Error::from_raw_os_error(-ret).kind(),
-                                      format!("Failed to enable event type {} code {} ({})", r#type, code, ret)));
+                return Err(Error::new(
+                    Error::from_raw_os_error(-ret).kind(),
+                    format!(
+                        "Failed to enable event type {} code {} ({})",
+                        r#type, code, ret
+                    ),
+                ));
             }
         }
     }

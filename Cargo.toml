@@ -1,2 +1,5 @@
 [workspace]
-members = ["proto","input","inputd","rkvm2"]
+members = ["proto","input","inputd","rkvm2","pipe","config"]
+
+[workspace.dependencies]
+version-rs = { git = "https://github.com/eucleo/version-rs.git" }

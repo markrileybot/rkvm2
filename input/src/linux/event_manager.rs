@@ -97,7 +97,12 @@ async fn spawn_reader(
 
     let reader = match EventReader::open(&path).await {
         Ok(reader) => reader,
-        Err(OpenError::Io(err)) => return Err(Error::new(err.kind(), format!("Failed to open {}.  {}", path.display(), err))),
+        Err(OpenError::Io(err)) => {
+            return Err(Error::new(
+                err.kind(),
+                format!("Failed to open {}.  {}", path.display(), err),
+            ))
+        }
         Err(OpenError::AlreadyOpened) => return Ok(()),
     };
 
@@ -124,7 +129,10 @@ async fn handle_notify(sender: UnboundedSender<Result<InputEvent, Error>>) -> Re
     Ok(())
 }
 
-async fn handle_events(mut reader: EventReader, sender: UnboundedSender<Result<InputEvent, Error>>) {
+async fn handle_events(
+    mut reader: EventReader,
+    sender: UnboundedSender<Result<InputEvent, Error>>,
+) {
     loop {
         let result = match reader.read().await {
             Ok(event) => sender.send(Ok(event)).is_ok(),

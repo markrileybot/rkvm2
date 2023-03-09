@@ -1,0 +1,15 @@
+[package]
+name = "rkvm2-config"
+version = "0.2.0"
+edition = "2018"
+
+[dependencies]
+clap-serde-derive = "0.2.0"
+clap = "4.1.8"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9.19"
+directories = "4.0.1"
+log = "0.4.11"
+
+[build-dependencies]
+version-rs.workspace = true

@@ -1,54 +1,37 @@
-use std::fs;
-use std::io::ErrorKind::AddrInUse;
+extern crate core;
+
 use futures::SinkExt;
 use futures::stream::StreamExt;
-use tokio::net::{UnixListener, UnixStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
+use rkvm2_config::Config;
 
 use rkvm2_input::linux::EventManager;
+use rkvm2_pipe::pipe;
+use rkvm2_pipe::pipe::INPUT_PIPE_NAME;
 use rkvm2_proto::{Message, MessageCodec};
 use rkvm2_proto::message::Payload;
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+    let config = Config::read();
     loop {
-        log::info!("Bind...");
-        match UnixListener::bind("/var/run/rkvm2.sock") {
-            Ok(listener) => {
-                match listener.accept().await {
-                    Ok((stream, _addr)) => {
-                        handle_stream(stream).await;
-                    }
-                    Err(e) => {
-                        log::warn!("Accept failed {}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                if e.kind() == AddrInUse {
-                    fs::remove_file("/var/run/rkvm2.sock").expect(format!("Failed to remove existing socket {}", e).as_str());
-                } else {
-                    panic!("Failed to bind to socket {}", e);
-                }
-            }
-        };
+        handle_stream(pipe::accept(INPUT_PIPE_NAME, config.socket_gid).await).await;
     }
 }
 
-async fn handle_stream(stream: UnixStream) {
-    // here we should await authentication
-
-    let mut event_manager = EventManager::new().await.expect("Failed to create event manager");
+async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T) {
     let (mut sink, mut source) = Framed::new(stream, MessageCodec::new()).split();
-    log::info!("Opened event manager");
+    let mut event_manager = EventManager::new()
+        .await
+        .expect("Failed to create event manager");
 
     loop {
         tokio::select! {
             event = event_manager.read() => {
                 match event {
                     Ok(input_event) => {
-                        log::info!("Send {:?}", input_event);
                         let _ = sink.send(Message {
                             header: None,
                             payload: Some(Payload::InputEvent(input_event.clone()))

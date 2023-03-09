@@ -25,8 +25,16 @@ fn main() -> Result<()> {
     let mut prost_build = prost_build::Config::new();
     prost_build
         .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
-        .type_attribute_with_filter(".", "#[derive(FromPrimitive,ToPrimitive)]", prost_build::TypeSelector::ProtobufEnum)
-        .type_attribute_with_filter(".", "#[serde(default)]", prost_build::TypeSelector::ProtobufMessage)
+        .type_attribute_with_filter(
+            ".",
+            "#[derive(FromPrimitive,ToPrimitive)]",
+            prost_build::TypeSelector::ProtobufEnum,
+        )
+        .type_attribute_with_filter(
+            ".",
+            "#[serde(default)]",
+            prost_build::TypeSelector::ProtobufMessage,
+        )
         .extern_path(".google.protobuf.Any", "::prost_wkt_types::Any")
         .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
         .extern_path(".google.protobuf.Value", "::prost_wkt_types::Value")

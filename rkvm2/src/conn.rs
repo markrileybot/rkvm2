@@ -32,38 +32,40 @@ pub trait Connector: Send + Sync + Debug {
 
 pub(crate) struct Connection;
 impl Connection {
-    pub(crate) fn open<T: Connector + 'static>(connector: T, sender: UnboundedSender<Message>) -> UnboundedSender<Message> {
-        let (ret_sender, mut receiver) = unbounded_channel() as (UnboundedSender<Message>, UnboundedReceiver<Message>);
+    pub(crate) fn open<T: Connector + 'static>(
+        connector: T,
+        sender: UnboundedSender<Message>,
+    ) -> UnboundedSender<Message> {
+        let (ret_sender, mut receiver) =
+            unbounded_channel() as (UnboundedSender<Message>, UnboundedReceiver<Message>);
 
         tokio::spawn(async move {
             loop {
                 match connector.connect().await {
-                    Ok((mut sink, mut stream)) => {
-                        loop {
-                            tokio::select! {
-                                maybe_msg = stream.next() => {
-                                    match maybe_msg {
-                                        Some(Ok(message)) => {
-                                            let _ = sender.send(message);
-                                        }
-                                        Some(Err(e)) => {
-                                            log::warn!("Failed to read message {}", e);
-                                            break;
-                                        }
-                                        None => {}
+                    Ok((mut sink, mut stream)) => loop {
+                        tokio::select! {
+                            maybe_msg = stream.next() => {
+                                match maybe_msg {
+                                    Some(Ok(message)) => {
+                                        let _ = sender.send(message);
                                     }
+                                    Some(Err(e)) => {
+                                        log::warn!("Failed to read message {}", e);
+                                        break;
+                                    }
+                                    None => {}
                                 }
-                                maybe_msg = receiver.recv() => {
-                                    if let Some(message) = maybe_msg {
-                                        if let Err(e) = sink.send(message).await {
-                                            log::warn!("Failed to send {}", e);
-                                            break;
-                                        }
+                            }
+                            maybe_msg = receiver.recv() => {
+                                if let Some(message) = maybe_msg {
+                                    if let Err(e) = sink.send(message).await {
+                                        log::warn!("Failed to send {}", e);
+                                        break;
                                     }
                                 }
                             }
                         }
-                    }
+                    },
                     Err(e) => {
                         log::warn!("Failed to open {:?}. {}", connector, e);
                         panic!("butts");
