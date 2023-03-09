@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 use std::io;
 use std::io::Error;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::time::sleep;
 
 use rkvm2_proto::Message;
 
@@ -68,7 +70,7 @@ impl Connection {
                     },
                     Err(e) => {
                         log::warn!("Failed to open {:?}. {}", connector, e);
-                        panic!("butts");
+                        sleep(Duration::from_secs(1)).await;
                     }
                 }
             }

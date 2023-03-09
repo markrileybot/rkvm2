@@ -27,7 +27,7 @@ fn main() -> Result<()> {
         .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
         .type_attribute_with_filter(
             ".",
-            "#[derive(FromPrimitive,ToPrimitive)]",
+            "#[derive(FromPrimitive,ToPrimitive,strum_macros::EnumString)]",
             prost_build::TypeSelector::ProtobufEnum,
         )
         .type_attribute_with_filter(

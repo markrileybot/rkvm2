@@ -10,6 +10,7 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.19"
 directories = "4.0.1"
 log = "0.4.11"
+rkvm2-proto = { path = "../proto" }
 
 [build-dependencies]
 version-rs.workspace = true

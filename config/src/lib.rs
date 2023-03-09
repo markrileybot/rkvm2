@@ -8,6 +8,7 @@ use clap_serde_derive::{
 };
 use directories::ProjectDirs;
 use serde::Serialize;
+use rkvm2_proto::Key;
 
 #[derive(Parser)]
 #[command(author, version=env!("VERSION_STRING"), about)]
@@ -33,6 +34,14 @@ pub struct Config {
     /// rkvm2 config: The broadcast address to use.  Default 192.168.24.255:45321
     #[arg(short = 'b', long = "broadcast-address")]
     pub broadcast_address: String,
+
+    /// rkvm2 config: The keys to use to switch to the next node.  Default RightCtrl+Tab
+    #[arg(short = 's', long = "switch-keys")]
+    pub switch_keys: Vec<Key>,
+
+    /// rkvm2 config: The keys to use to switch back to the commander.  Default RightCtrl+RightAlt
+    #[arg(short = 'S', long = "switch-commander-keys")]
+    pub commander_keys: Vec<Key>,
 
     /// rkvm2-inputd config: True if this host is the commander.  Default false
     #[arg(short = 'C', long = "commander")]
@@ -76,9 +85,17 @@ impl Config {
         if config.broadcast_address.is_empty() {
             config.broadcast_address = "192.168.24.255:45321".to_string();
         }
+        if config.switch_keys.is_empty() {
+            config.switch_keys.push(Key::RightCtrl);
+            config.switch_keys.push(Key::Tab);
+        }
+        if config.commander_keys.is_empty() {
+            config.commander_keys.push(Key::RightCtrl);
+            config.commander_keys.push(Key::RightAlt);
+        }
 
         if args.dump_config {
-            println!("{}", serde_yaml::to_string(&config).expect("Failed to serialize config"));
+            println!("# RKVM2 Config\n\n{}", serde_yaml::to_string(&config).expect("Failed to serialize config"));
             exit(0);
         }
 

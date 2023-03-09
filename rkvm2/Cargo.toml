@@ -15,9 +15,11 @@ rkvm2-proto = { path = "../proto" }
 rkvm2-pipe = { path = "../pipe" }
 rkvm2-config = { path = "../config" }
 async-trait = "0.1.66"
+num-traits = "0.2.14"
 itertools = "0.10.5"
 hostname = "0.3.1"
 env_logger = "0.10.0"
+arboard = "3.2.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio = { version = "1.26.0", features = ["fs", "io-util", "net", "sync", "rt-multi-thread", "time", "macros"] }

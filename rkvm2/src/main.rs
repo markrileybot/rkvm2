@@ -1,14 +1,17 @@
 extern crate core;
 
 use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::time::{Duration, Instant};
+use arboard::Clipboard;
 
 use itertools::Itertools;
+use num_traits::cast::ToPrimitive;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::sleep;
 
 use rkvm2_config::Config;
-use rkvm2_proto::{ActiveNodeChangedEvent, ClipboardEvent, Header, Message, PingEvent};
+use rkvm2_proto::{ActiveNodeChangedEvent, ClipboardEvent, Header, InputEvent, Key, Message, PingEvent};
 use rkvm2_proto::input_event::InputEventType;
 use rkvm2_proto::message::Payload;
 
@@ -23,10 +26,25 @@ trait Action: Send {
     fn act(&self, app: &App);
 }
 
-struct ActiveNodeChangeAction;
+struct ActiveNodeChangeAction {
+    node_index: Option<usize>
+}
+impl ActiveNodeChangeAction {
+    fn for_next_node() -> Self {
+        Self {
+            node_index: None,
+        }
+    }
+    fn for_node(node_index: usize) -> Self {
+        Self {
+            node_index: Some(node_index),
+        }
+    }
+}
 impl Action for ActiveNodeChangeAction {
     fn act(&self, app: &App) {
-        if let Some(next_node) = app.nodes.get((app.active_node + 1) % app.nodes.len()) {
+        let next_node_index = self.node_index.unwrap_or((app.active_node + 1) % app.nodes.len());
+        if let Some(next_node) = app.nodes.get(next_node_index) {
             let name = next_node.name.clone();
             app.send_to_loopback(Message {
                 header: None,
@@ -43,6 +61,12 @@ struct KeyBinding {
     action: Box<dyn Action>,
 }
 impl KeyBinding {
+    fn new(keys: Vec<Key>, action: Box<dyn Action>) -> Self {
+        Self {
+            keys: HashSet::from_iter(keys.iter().map(|k| k.to_i32().unwrap())),
+            action
+        }
+    }
     fn act(&self, app: &App) {
         if self.keys == app.keys {
             self.action.act(app)
@@ -50,6 +74,7 @@ impl KeyBinding {
     }
 }
 
+#[derive(Debug)]
 struct Node {
     commander: bool,
     local: bool,
@@ -75,10 +100,10 @@ struct App {
 }
 
 impl App {
-    async fn run(name: String, broadcast_address: String) {
+    async fn run(name: String, config: Config) {
         let (message_sender, mut message_receiver) = unbounded_channel();
         let input_sender = InputClient::open(message_sender.clone());
-        let net_sender = Distributor::open(broadcast_address, message_sender.clone());
+        let net_sender = Distributor::open(config.broadcast_address, message_sender.clone());
         let ping_sender = message_sender.clone();
 
         let my_node = Node {
@@ -88,11 +113,16 @@ impl App {
             last_heard_from: Instant::now(),
         };
 
+        let key_bindings = vec![
+            KeyBinding::new(config.switch_keys, Box::new(ActiveNodeChangeAction::for_next_node())),
+            KeyBinding::new(config.commander_keys, Box::new(ActiveNodeChangeAction::for_node(0))),
+        ];
+
         let mut app = Self {
             nodes: vec![my_node],
             keys: Default::default(),
             active_node: 0,
-            key_bindings: Default::default(),
+            key_bindings,
             input_sender,
             net_sender,
             message_sender,
@@ -143,135 +173,176 @@ impl App {
         }
     }
 
-    fn handle_message(&mut self, mut message: Message) {
-        let mut send_out = false;
-        let mut send_destination = "";
-        let mut recv_source = "";
+    fn handle_message(&mut self, message: Message) {
+        log::trace!("{:?}", message);
+        let mut origin = String::new();
+        let mut from_net = false;
 
-        match &message {
-            Message {
-                header: maybe_header,
-                payload: Some(payload),
-            } => {
-                match maybe_header {
-                    None => {
-                        // internal messages that want to be sent out have no header
-                        send_out = true;
-                    }
-                    Some(header) => {
-                        let my_node = self.nodes.get(0).unwrap();
+        if let Some(header) = &message.header {
+            let my_node = self.nodes.get(0).unwrap();
+            if header.from_id == my_node.name {
+                // external messages that are from me
+                return;
+            } else if !header.to_id.is_empty() && header.to_id != my_node.name {
+                // external messages that aren't for me
+                return;
+            } else {
+                // external messages that aren't for me
+                origin = header.from_id.clone();
+            }
+            from_net = !origin.is_empty();
+        }
 
-                        // external messages that are from me
-                        if header.from_id == my_node.name {
-                            return;
-                        }
-                        // external messages that aren't for me
-                        if !header.to_id.is_empty() && header.to_id != my_node.name {
-                            return;
-                        }
-
-                        recv_source = header.from_id.as_str();
-                    }
+        if let Some(payload) = &message.payload {
+            match payload {
+                Payload::PingEvent(ping) => {
+                    self.handle_ping(from_net, origin, ping);
                 }
-
-                match payload {
-                    Payload::Empty(_) => {}
-                    Payload::NotifyEvent(_) => {}
-                    Payload::PingEvent(ping) => {
-                        if send_out {
-                            let my_node = self.nodes.get(0).unwrap();
-                            message = Message {
-                                header: None,
-                                payload: Some(Payload::PingEvent(PingEvent {
-                                    commander: my_node.commander,
-                                })),
-                            };
-
-                            let now = Instant::now();
-                            self.nodes.retain(|n| {
-                                if n.expired(now) {
-                                    log::info!("Expiring {}", n.name);
-                                    return false;
-                                }
-                                return true;
-                            });
-                        } else {
-                            if let Some(node) =
-                                self.nodes.iter_mut().find(|n| n.name == recv_source)
-                            {
-                                node.last_heard_from = Instant::now();
-                                node.commander = ping.commander;
-                            } else {
-                                self.nodes.push(Node {
-                                    commander: ping.commander,
-                                    local: false,
-                                    name: recv_source.to_string(),
-                                    last_heard_from: Instant::now(),
-                                });
-                            }
-                            return;
-                        }
-                    }
-                    Payload::ClipboardEvent(_) => {}
-                    Payload::InputEvent(e) => {
-                        let my_node = self.nodes.get_mut(0).unwrap();
-
-                        // if we're getting an input event without a header that means we're the commander
-                        my_node.commander = send_out;
-
-                        if my_node.commander {
-                            if let Some(InputEventType::Key(key_event)) = &e.input_event_type {
-                                let changed = match key_event.down {
-                                    true => self.keys.insert(key_event.key),
-                                    false => self.keys.remove(&key_event.key),
-                                };
-
-                                if changed {
-                                    for key_binding in &self.key_bindings {
-                                        key_binding.act(self);
-                                    }
-                                }
-                            }
-                        }
-
-                        let active_node = self.nodes.get(self.active_node).unwrap();
-                        send_destination = active_node.name.as_str();
-                        if active_node.local {
-                            self.send_to_input(message);
-                            return;
-                        }
-                    }
-                    Payload::ActiveNodeChangedEvent(e) => {
-                        let my_node = self.nodes.get(0).unwrap();
-                        let active_node = self.nodes.get(self.active_node).unwrap();
-
-                        if active_node.name == my_node.name {
-                            // if I'm about to be switched, send my clip contents
-                            self.send_to_net(
-                                Message {
-                                    header: None,
-                                    payload: Some(Payload::ClipboardEvent(ClipboardEvent {
-                                        data: vec![],
-                                        mime_type: "".to_string(),
-                                    })),
-                                },
-                                "",
-                            )
-                        }
-                        if let Some((new_active_node, _)) =
-                            self.nodes.iter().find_position(|n| n.name == e.name)
-                        {
-                            // switch the active node
-                            self.active_node = new_active_node;
-                        }
+                Payload::InputEvent(_) => {
+                    self.handle_input(message, from_net)
+                }
+                Payload::ActiveNodeChangedEvent(active_node_changed) => {
+                    self.handle_active_node_changed(active_node_changed)
+                }
+                Payload::ClipboardEvent(clipboard) => {
+                    self.handle_clipboard(clipboard);
+                }
+                _ => {
+                    if !from_net {
+                        self.send_to_net(message, "");
                     }
                 }
             }
-            _ => {}
+        }
+    }
+
+    fn handle_active_node_changed(&mut self, active_node_changed: &ActiveNodeChangedEvent) {
+        if let Some((new_active_node, node)) =
+            self.nodes.iter().find_position(|n| n.name == active_node_changed.name)
+        {
+            if self.active_node != new_active_node {
+                // my node is active
+                if self.active_node == 0 {
+                    // if I'm about to be switched, send my clip contents
+                    match Clipboard::new() {
+                        Ok(mut clipboard) => {
+                            match clipboard.get_text() {
+                                Ok(text) => {
+                                    log::debug!("Send clip text\n{}", text);
+                                    self.send_to_net(
+                                        Message {
+                                            header: None,
+                                            payload: Some(Payload::ClipboardEvent(ClipboardEvent {
+                                                data: text.into_bytes(),
+                                                mime_type: "".to_string(),
+                                            })),
+                                        },
+                                        "",
+                                    )
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to get clipboard text {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to get clipboard {}", e);
+                        }
+                    }
+                }
+                // switch the active node
+                self.active_node = new_active_node;
+                log::debug!("Switched to {:?}", node);
+            }
+        }
+    }
+
+    fn handle_input(&mut self, message: Message, from_net: bool) {
+        {
+            let my_node = self.nodes.get_mut(0).unwrap();
+
+            // if we're getting an input event without a header that means we're the commander
+            my_node.commander = !from_net;
+
+            if my_node.commander {
+                match &message {
+                    Message {header: _, payload: Some(Payload::InputEvent(InputEvent{input_event_type: Some(InputEventType::Key(key_event))}))} => {
+                        let changed = match key_event.down {
+                            true => self.keys.insert(key_event.key),
+                            false => self.keys.remove(&key_event.key),
+                        };
+
+                        if changed {
+                            for key_binding in &self.key_bindings {
+                                key_binding.act(self);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
 
-        if send_out {
-            self.send_to_net(message, send_destination);
+        let active_node = self.nodes.get(self.active_node).unwrap();
+        if active_node.local {
+            self.send_to_input(message);
+            return;
+        }
+
+        let my_node = self.nodes.get(0).unwrap();
+        if my_node.commander {
+            self.send_to_net(message, active_node.name.as_str())
+        }
+    }
+
+    fn handle_ping(&mut self, from_net: bool, origin: String, ping: &PingEvent) {
+        if from_net {
+            if let Some(node) =
+                self.nodes.iter_mut().find(|n| n.name == origin)
+            {
+                node.last_heard_from = Instant::now();
+                node.commander = ping.commander;
+            } else {
+                log::info!("Adding {}", origin);
+                self.nodes.push(Node {
+                    commander: ping.commander,
+                    local: false,
+                    name: origin,
+                    last_heard_from: Instant::now(),
+                });
+            }
+        } else {
+            let now = Instant::now();
+            self.nodes.retain(|n| {
+                if n.expired(now) {
+                    log::info!("Expiring {}", n.name);
+                    return false;
+                }
+                return true;
+            });
+
+            let my_node = self.nodes.get(0).unwrap();
+            self.send_to_net(Message {
+                header: None,
+                payload: Some(Payload::PingEvent(PingEvent {
+                    commander: my_node.commander,
+                })),
+            }, "");
+        }
+    }
+
+    fn handle_clipboard(&self, clipboard: &ClipboardEvent) {
+        let text = String::from_utf8_lossy(&clipboard.data);
+        log::debug!("Got clip text\n{}", text);
+        match Clipboard::new() {
+            Ok(mut clipboard) => {
+                if let Err(e) = clipboard.set_text(text) {
+                    log::warn!("Failed to set clipboard text {}", e);
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to get clipboard {}", e);
+            }
         }
     }
 }
@@ -280,9 +351,5 @@ impl App {
 async fn main() {
     env_logger::init();
     let config = Config::read();
-    App::run(
-        hostname::get().unwrap().into_string().unwrap(),
-        config.broadcast_address,
-    )
-    .await;
+    App::run(hostname::get().unwrap().into_string().unwrap(), config).await;
 }

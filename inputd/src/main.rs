@@ -17,26 +17,32 @@ async fn main() {
     env_logger::init();
     let config = Config::read();
     loop {
-        handle_stream(pipe::accept(INPUT_PIPE_NAME, config.socket_gid).await).await;
+        handle_stream(pipe::accept(INPUT_PIPE_NAME, config.socket_gid).await, config.commander).await;
     }
 }
 
-async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T) {
+async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T, commander: bool) {
     let (mut sink, mut source) = Framed::new(stream, MessageCodec::new()).split();
     let mut event_manager = EventManager::new()
         .await
         .expect("Failed to create event manager");
+    log::debug!("Received connection");
 
     loop {
         tokio::select! {
             event = event_manager.read() => {
                 match event {
                     Ok(input_event) => {
-                        let _ = sink.send(Message {
-                            header: None,
-                            payload: Some(Payload::InputEvent(input_event.clone()))
-                        }).await;
-                        let _ = event_manager.write(input_event).await;
+                        if commander {
+                            if let Err(e) = sink.send(Message {header: None, payload: Some(Payload::InputEvent(input_event))}).await {
+                                log::warn!("Failed to send input event {}", e);
+                                return;
+                            }
+                        } else {
+                            if let Err(e) = event_manager.write(input_event).await {
+                                panic!("Error sending input event {}", e);
+                            }
+                        }
                     }
                     Err(e) => {
                         panic!("Error receiving input event {}", e);
