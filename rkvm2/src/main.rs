@@ -68,10 +68,12 @@ impl KeyBinding {
             action
         }
     }
-    fn act(&self, app: &App) {
+    fn act(&self, app: &App) -> bool {
         if self.keys == app.keys {
-            self.action.act(app)
+            self.action.act(app);
+            return true;
         }
+        return false;
     }
 }
 
@@ -293,8 +295,12 @@ impl App {
                         };
 
                         if changed {
+                            let mut handled = false;
                             for key_binding in &self.key_bindings {
-                                key_binding.act(self);
+                                handled |= key_binding.act(self);
+                            }
+                            if handled {
+                                return;
                             }
                         }
                     }

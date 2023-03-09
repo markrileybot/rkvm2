@@ -35,11 +35,11 @@ pub struct Config {
     #[arg(short = 'b', long = "broadcast-address")]
     pub broadcast_address: String,
 
-    /// rkvm2 config: The keys to use to switch to the next node.  Default RightCtrl+Tab
+    /// rkvm2 config: The keys to use to switch to the next node.  Default RightCtrl+RightAlt
     #[arg(short = 's', long = "switch-keys")]
     pub switch_keys: Vec<Key>,
 
-    /// rkvm2 config: The keys to use to switch back to the commander.  Default RightCtrl+RightAlt
+    /// rkvm2 config: The keys to use to switch back to the commander.  Default RightCtrl+Home
     #[arg(short = 'S', long = "switch-commander-keys")]
     pub commander_keys: Vec<Key>,
 
@@ -87,11 +87,11 @@ impl Config {
         }
         if config.switch_keys.is_empty() {
             config.switch_keys.push(Key::RightCtrl);
-            config.switch_keys.push(Key::Tab);
+            config.switch_keys.push(Key::RightAlt);
         }
         if config.commander_keys.is_empty() {
             config.commander_keys.push(Key::RightCtrl);
-            config.commander_keys.push(Key::RightAlt);
+            config.commander_keys.push(Key::Home);
         }
 
         if args.dump_config {
