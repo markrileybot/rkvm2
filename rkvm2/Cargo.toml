@@ -19,7 +19,7 @@ num-traits = "0.2.14"
 itertools = "0.10.5"
 hostname = "0.3.1"
 env_logger = "0.10.0"
-arboard = "3.2.0"
+arboard = { version = "3.2.0", features = ["wayland-data-control"] }
 notify-rust = "4.8.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]

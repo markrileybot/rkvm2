@@ -16,9 +16,9 @@ use rkvm2_proto::message::Payload;
 async fn main() {
     env_logger::init();
     let config = Config::read();
-    loop {
-        handle_stream(pipe::accept(INPUT_PIPE_NAME, config.socket_gid).await, config.commander).await;
-    }
+    log::debug!("Awaiting connection");
+    let stream = pipe::accept(INPUT_PIPE_NAME, config.socket_gid).await;
+    handle_stream(stream, config.commander).await;
 }
 
 async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T, commander: bool) {
@@ -55,6 +55,9 @@ async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T, commander: bool) {
                         if let Err(e) = event_manager.write(input_event).await {
                             log::warn!("Failed to write input event {:?}", e);
                         }
+                    }
+                    Some(Ok(Message {header: _, payload: Some(Payload::PingEvent(_))})) => {
+                        // ignore
                     }
                     Some(Ok(message)) => {
                         log::warn!("Invalid message type {:?}", message);

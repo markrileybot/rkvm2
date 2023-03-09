@@ -390,6 +390,11 @@ impl App {
             }
             self.nodes.retain(|n| !n.expired(now));
 
+            self.send_to_input(Message {
+                header: None,
+                payload: Some(Payload::PingEvent(PingEvent::default())),
+            });
+
             let my_node = self.nodes.get(0).unwrap();
             self.send_to_net(Message {
                 header: None,
