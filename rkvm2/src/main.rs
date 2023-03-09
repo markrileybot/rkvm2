@@ -68,12 +68,10 @@ impl KeyBinding {
             action
         }
     }
-    fn act(&self, app: &App) -> bool {
+    fn act(&self, app: &App) {
         if self.keys == app.keys {
             self.action.act(app);
-            return true;
         }
-        return false;
     }
 }
 
@@ -202,7 +200,7 @@ impl App {
                     self.handle_ping(from_net, origin, ping);
                 }
                 Payload::InputEvent(_) => {
-                    self.handle_input(message, from_net)
+                    self.handle_input(message);
                 }
                 Payload::ActiveNodeChangedEvent(active_node_changed) => {
                     self.handle_active_node_changed(from_net, active_node_changed)
@@ -279,33 +277,23 @@ impl App {
         }
     }
 
-    fn handle_input(&mut self, message: Message, from_net: bool) {
-        {
-            let my_node = self.nodes.get_mut(0).unwrap();
+    fn handle_input(&mut self, message: Message) {
+        let my_node = self.nodes.get(0).unwrap();
+        if my_node.commander {
+            match &message {
+                Message {header: _, payload: Some(Payload::InputEvent(InputEvent{input_event_type: Some(InputEventType::Key(key_event))}))} => {
+                    let changed = match key_event.down {
+                        true => self.keys.insert(key_event.key),
+                        false => self.keys.remove(&key_event.key),
+                    };
 
-            // if we're getting an input event without a header that means we're the commander
-            my_node.commander = !from_net;
-
-            if my_node.commander {
-                match &message {
-                    Message {header: _, payload: Some(Payload::InputEvent(InputEvent{input_event_type: Some(InputEventType::Key(key_event))}))} => {
-                        let changed = match key_event.down {
-                            true => self.keys.insert(key_event.key),
-                            false => self.keys.remove(&key_event.key),
-                        };
-
-                        if changed {
-                            let mut handled = false;
-                            for key_binding in &self.key_bindings {
-                                handled |= key_binding.act(self);
-                            }
-                            if handled {
-                                return;
-                            }
+                    if changed {
+                        for key_binding in &self.key_bindings {
+                            key_binding.act(self);
                         }
                     }
-                    _ => {}
                 }
+                _ => {}
             }
         }
 
