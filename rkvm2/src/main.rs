@@ -12,7 +12,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::sleep;
 
 use rkvm2_config::Config;
-use rkvm2_proto::{ActiveNodeChangedEvent, ClipboardEvent, Header, InputEvent, Key, Message, PingEvent};
+use rkvm2_proto::{ActiveNodeChangedEvent, ClipboardEvent, Header, InputEvent, Key, KeyEvent, Message, PingEvent};
 use rkvm2_proto::input_event::InputEventType;
 use rkvm2_proto::message::Payload;
 
@@ -250,6 +250,20 @@ impl App {
                             log::warn!("Failed to get clipboard {}", e);
                         }
                     }
+
+                    // release any keybinding keys
+                    for key in &self.keys {
+                        self.send_to_input(Message {
+                            header: None,
+                            payload: Some(Payload::InputEvent(InputEvent {
+                                input_event_type: Some(InputEventType::Key(KeyEvent {
+                                    key: key.clone(),
+                                    down: false,
+                                })),
+                            })),
+                        });
+                    }
+                    self.keys.clear();
                 }
 
                 // switch the active node
@@ -278,22 +292,23 @@ impl App {
     }
 
     fn handle_input(&mut self, message: Message) {
-        let my_node = self.nodes.get(0).unwrap();
-        if my_node.commander {
-            match &message {
-                Message {header: _, payload: Some(Payload::InputEvent(InputEvent{input_event_type: Some(InputEventType::Key(key_event))}))} => {
-                    let changed = match key_event.down {
-                        true => self.keys.insert(key_event.key),
-                        false => self.keys.remove(&key_event.key),
-                    };
-
-                    if changed {
-                        for key_binding in &self.key_bindings {
-                            key_binding.act(self);
-                        }
-                    }
+        // track the keys.  Any keys remaining after a switch should be released
+        let keys_changed = match &message {
+            Message { header: _, payload: Some(Payload::InputEvent(InputEvent { input_event_type: Some(InputEventType::Key(key_event)) })) } => {
+                match key_event.down {
+                    true => self.keys.insert(key_event.key),
+                    false => self.keys.remove(&key_event.key),
                 }
-                _ => {}
+            }
+            _ => false,
+        };
+
+        if keys_changed {
+            let my_node = self.nodes.get(0).unwrap();
+            if my_node.commander {
+                for key_binding in &self.key_bindings {
+                    key_binding.act(self);
+                }
             }
         }
 
