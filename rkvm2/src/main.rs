@@ -3,9 +3,10 @@ extern crate core;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::time::{Duration, Instant};
-use arboard::Clipboard;
 
+use arboard::Clipboard;
 use itertools::Itertools;
+use notify_rust::{Notification, NotificationHandle};
 use num_traits::cast::ToPrimitive;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::sleep;
@@ -97,6 +98,7 @@ struct App {
     input_sender: UnboundedSender<Message>,
     net_sender: UnboundedSender<Message>,
     message_sender: UnboundedSender<Message>,
+    current_notification: Option<NotificationHandle>
 }
 
 impl App {
@@ -107,7 +109,7 @@ impl App {
         let ping_sender = message_sender.clone();
 
         let my_node = Node {
-            commander: false,
+            commander: config.commander,
             local: true,
             name,
             last_heard_from: Instant::now(),
@@ -121,18 +123,19 @@ impl App {
         let mut app = Self {
             nodes: vec![my_node],
             keys: Default::default(),
-            active_node: 0,
+            active_node: if config.commander {0} else {usize::MAX},
             key_bindings,
             input_sender,
             net_sender,
             message_sender,
+            current_notification: None,
         };
 
         tokio::spawn(async move {
             loop {
                 if let Err(e) = ping_sender.send(Message {
                     header: None,
-                    payload: Some(Payload::PingEvent(PingEvent { commander: false })),
+                    payload: Some(Payload::PingEvent(PingEvent::default())),
                 }) {
                     log::warn!("Failed to send ping {}", e);
                 }
@@ -156,11 +159,9 @@ impl App {
     fn send_to_net(&self, mut message: Message, to_id: &str) {
         let my_node = self.nodes.get(0).unwrap();
         message.header = Some(Header {
-            id: "".to_string(),
             from_id: my_node.name.clone(),
             to_id: to_id.to_string(),
-            time: None,
-            header_type: None,
+            ..Header::default()
         });
         if let Err(e) = self.net_sender.send(message) {
             log::warn!("Failed to send message {}", e);
@@ -202,7 +203,7 @@ impl App {
                     self.handle_input(message, from_net)
                 }
                 Payload::ActiveNodeChangedEvent(active_node_changed) => {
-                    self.handle_active_node_changed(active_node_changed)
+                    self.handle_active_node_changed(from_net, active_node_changed)
                 }
                 Payload::ClipboardEvent(clipboard) => {
                     self.handle_clipboard(clipboard);
@@ -216,7 +217,7 @@ impl App {
         }
     }
 
-    fn handle_active_node_changed(&mut self, active_node_changed: &ActiveNodeChangedEvent) {
+    fn handle_active_node_changed(&mut self, from_net: bool, active_node_changed: &ActiveNodeChangedEvent) {
         if let Some((new_active_node, node)) =
             self.nodes.iter().find_position(|n| n.name == active_node_changed.name)
         {
@@ -250,10 +251,29 @@ impl App {
                         }
                     }
                 }
+
                 // switch the active node
                 self.active_node = new_active_node;
                 log::debug!("Switched to {:?}", node);
+
+                let active_node_name = node.name.clone();
+                if new_active_node == 0 {
+                    self.notify("I'm over here!");
+                } else {
+                    self.notify(format!("Switched to {}", active_node_name).as_str());
+                }
+
+                if !from_net {
+                    self.send_to_net(Message {
+                        header: None,
+                        payload: Some(Payload::ActiveNodeChangedEvent(ActiveNodeChangedEvent {
+                            name: active_node_name,
+                        })),
+                    }, "");
+                }
             }
+        } else {
+            log::debug!("New active node {} not found", active_node_changed.name);
         }
     }
 
@@ -307,8 +327,29 @@ impl App {
                 self.nodes.push(Node {
                     commander: ping.commander,
                     local: false,
-                    name: origin,
+                    name: origin.clone(),
                     last_heard_from: Instant::now(),
+                });
+            }
+
+            // if we got the ping from the commander, make sure we're tracking state properly
+            if ping.commander {
+                if let Some((pos, _)) = self.nodes.iter().find_position(|n| n.name == ping.active_node) {
+                    if self.active_node == pos {
+                        // we don't need the extra event
+                        return;
+                    }
+                }
+
+                // send an event on loopback that looks like an active node changed event from the commander
+                self.send_to_loopback(Message {
+                    header: Some(Header {
+                        from_id: origin,
+                        ..Header::default()
+                    }),
+                    payload: Some(Payload::ActiveNodeChangedEvent(ActiveNodeChangedEvent {
+                        name: ping.active_node.clone(),
+                    })),
                 });
             }
         } else {
@@ -326,6 +367,15 @@ impl App {
                 header: None,
                 payload: Some(Payload::PingEvent(PingEvent {
                     commander: my_node.commander,
+                    active_node: if my_node.commander {
+                        if let Some(n) = self.nodes.get(self.active_node) {
+                            n.name.clone()
+                        } else {
+                            "".to_string()
+                        }
+                    } else {
+                        "".to_string()
+                    },
                 })),
             }, "");
         }
@@ -342,6 +392,22 @@ impl App {
             }
             Err(e) => {
                 log::warn!("Failed to get clipboard {}", e);
+            }
+        }
+    }
+
+    fn notify(&mut self, message: &str)  {
+        match Notification::new()
+            .summary("RKVM")
+            .body(message)
+            .show() {
+            Ok(notification_handle) => {
+                if let Some(previous_handle) = self.current_notification.replace(notification_handle) {
+                    previous_handle.close();
+                }
+            }
+            Err(e) => {
+                log::debug!("Failed to notify {}", e);
             }
         }
     }
