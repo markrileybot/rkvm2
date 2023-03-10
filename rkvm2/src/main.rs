@@ -272,9 +272,9 @@ impl App {
 
                 let active_node_name = node.name.clone();
                 if new_active_node == 0 {
-                    self.notify("I'm over here!");
+                    self.notify("I have the conn");
                 } else {
-                    self.notify(format!("Switched to {}", active_node_name).as_str());
+                    self.notify(format!("{} has the conn", active_node_name).as_str());
                 }
 
                 if !from_net {
