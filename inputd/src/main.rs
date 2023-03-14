@@ -63,12 +63,14 @@ async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T, commander: bool) {
             }
             maybe_msg = source.next() => {
                 match maybe_msg {
-                    Some(Ok(Message {header: Some(header), payload: Some(Payload::InputEvent(input_event))})) => {
-                        if header.sequence != sequence_tracker + 1 {
-                            log::warn!("Unexpected sequence.  Got {} expected {}", header.sequence, sequence_tracker + 1);
+                    Some(Ok(Message {header: maybe_header, payload: Some(Payload::InputEvent(input_event))})) => {
+                        if let Some(header) = maybe_header {
+                            if header.sequence != sequence_tracker + 1 {
+                                log::warn!("Unexpected sequence.  Got {} expected {}", header.sequence, sequence_tracker + 1);
+                            }
+                            log::trace!("Send event {:?}", header.elapsed_time(SystemTime::now()));
+                            sequence_tracker = header.sequence;
                         }
-                        log::trace!("Send event {:?}", header.elapsed_time(SystemTime::now()));
-                        sequence_tracker = header.sequence;
                         if let Err(e) = event_manager.write(input_event).await {
                             log::warn!("Failed to write input event {:?}", e);
                         }
