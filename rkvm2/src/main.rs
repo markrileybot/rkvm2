@@ -23,6 +23,9 @@ mod conn;
 mod input;
 mod net;
 
+const PING_INTERVAL: Duration = Duration::from_secs(3);
+const NODE_TIMEOUT: Duration = Duration::from_secs(9);
+
 trait Action: Send {
     fn act(&self, app: &App);
 }
@@ -86,7 +89,7 @@ impl Node {
     fn expired(&self, now: Instant) -> bool {
         return !self.commander
             && !self.local
-            && now.duration_since(self.last_heard_from) > Duration::from_secs(3);
+            && now.duration_since(self.last_heard_from) > NODE_TIMEOUT;
     }
 }
 
@@ -139,7 +142,7 @@ impl App {
                 }) {
                     log::warn!("Failed to send ping {}", e);
                 }
-                sleep(Duration::from_secs(3)).await;
+                sleep(PING_INTERVAL).await;
             }
         });
 
