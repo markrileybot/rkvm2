@@ -9,6 +9,7 @@ use std::mem::MaybeUninit;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
+use prost_wkt_types::Timestamp;
 use tokio::io::unix::AsyncFd;
 
 pub(crate) struct EventReader {
@@ -96,7 +97,7 @@ impl EventReader {
         })
     }
 
-    pub async fn read(&mut self) -> Result<InputEvent, Error> {
+    pub async fn read(&mut self) -> Result<(InputEvent, Timestamp), Error> {
         loop {
             let result = self.file.readable().await?.try_io(|_| {
                 let mut event = MaybeUninit::uninit();

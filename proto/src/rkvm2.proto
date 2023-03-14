@@ -716,6 +716,10 @@ message Header {
    */
   google.protobuf.Timestamp time = 4;
   /**
+   * Optional sequence.  This is useful for tracking missing events
+   */
+  uint64 sequence = 5;
+  /**
    * Specific header information
    */
   oneof header_type {

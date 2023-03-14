@@ -1842,6 +1842,7 @@ dependencies = [
  "log",
  "nix 0.26.2",
  "pkg-config",
+ "prost-wkt-types",
  "rkvm2-proto",
  "serde",
  "tokio",
@@ -1880,6 +1881,7 @@ dependencies = [
 name = "rkvm2-proto"
 version = "0.1.0"
 dependencies = [
+ "log",
  "num-derive",
  "num-traits",
  "prost 0.11.8",

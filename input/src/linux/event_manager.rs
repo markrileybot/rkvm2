@@ -5,6 +5,7 @@ use std::time::Duration;
 use futures::StreamExt;
 use inotify::{Inotify, WatchMask};
 use nix::libc;
+use prost_wkt_types::Timestamp;
 use tokio::fs;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot::{self, Receiver};
@@ -19,7 +20,7 @@ const EVENT_PATH: &str = "/dev/input";
 
 pub struct EventManager {
     writer: EventWriter,
-    event_receiver: UnboundedReceiver<Result<InputEvent, Error>>,
+    event_receiver: UnboundedReceiver<Result<(InputEvent, Timestamp), Error>>,
     watcher_receiver: Receiver<Error>,
 }
 
@@ -61,7 +62,7 @@ impl EventManager {
         })
     }
 
-    pub async fn read(&mut self) -> Result<InputEvent, Error> {
+    pub async fn read(&mut self) -> Result<(InputEvent, Timestamp), Error> {
         if let Ok(err) = self.watcher_receiver.try_recv() {
             return Err(err);
         }
@@ -79,7 +80,7 @@ impl EventManager {
 
 async fn spawn_reader(
     path: &Path,
-    sender: UnboundedSender<Result<InputEvent, Error>>,
+    sender: UnboundedSender<Result<(InputEvent, Timestamp), Error>>,
 ) -> Result<(), Error> {
     if path.is_dir() {
         return Ok(());
@@ -110,7 +111,7 @@ async fn spawn_reader(
     Ok(())
 }
 
-async fn handle_notify(sender: UnboundedSender<Result<InputEvent, Error>>) -> Result<(), Error> {
+async fn handle_notify(sender: UnboundedSender<Result<(InputEvent, Timestamp), Error>>) -> Result<(), Error> {
     let mut inotify = Inotify::init()?;
     inotify.add_watch(EVENT_PATH, WatchMask::CREATE)?;
 
@@ -131,7 +132,7 @@ async fn handle_notify(sender: UnboundedSender<Result<InputEvent, Error>>) -> Re
 
 async fn handle_events(
     mut reader: EventReader,
-    sender: UnboundedSender<Result<InputEvent, Error>>,
+    sender: UnboundedSender<Result<(InputEvent, Timestamp), Error>>,
 ) {
     loop {
         let result = match reader.read().await {

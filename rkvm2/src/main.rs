@@ -2,7 +2,7 @@ extern crate core;
 
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use arboard::Clipboard;
 use itertools::Itertools;
@@ -139,7 +139,7 @@ impl App {
                 }) {
                     log::warn!("Failed to send ping {}", e);
                 }
-                sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(3)).await;
             }
         });
 
@@ -158,11 +158,9 @@ impl App {
 
     fn send_to_net(&self, mut message: Message, to_id: &str) {
         let my_node = self.nodes.get(0).unwrap();
-        message.header = Some(Header {
-            from_id: my_node.name.clone(),
-            to_id: to_id.to_string(),
-            ..Header::default()
-        });
+        let mut header = message.header.get_or_insert(Header::default());
+        header.from_id = my_node.name.clone();
+        header.to_id = to_id.to_string();
         if let Err(e) = self.net_sender.send(message) {
             log::warn!("Failed to send message {}", e);
         }
@@ -175,7 +173,7 @@ impl App {
     }
 
     fn handle_message(&mut self, message: Message) {
-        log::trace!("{:?}", message);
+        log::trace!("{:?} {:?}", message, message.elapsed_time(SystemTime::now()));
         let mut origin = String::new();
         let mut from_net = false;
 
@@ -187,7 +185,7 @@ impl App {
             } else if !header.to_id.is_empty() && header.to_id != my_node.name {
                 // external messages that aren't for me
                 return;
-            } else {
+            } else if !header.from_id.is_empty() {
                 // external messages that aren't for me
                 origin = header.from_id.clone();
             }

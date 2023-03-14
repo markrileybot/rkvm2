@@ -4,25 +4,42 @@ extern crate prost;
 extern crate prost_wkt;
 extern crate prost_wkt_types;
 
+use std::convert::TryFrom;
 use std::io;
 use std::marker::PhantomData;
+use std::time::{Duration, SystemTime};
 
-use prost::bytes::BytesMut;
-use prost::{DecodeError, Message as ProstMessage};
+use prost::{encoding, Message as ProstMessage};
+use prost::bytes::{Buf, BufMut, BytesMut};
+use prost::encoding::{DecodeContext, WireType};
 use tokio_util::codec::{Decoder, Encoder};
 
 pub const PROTO_VERSION_STRING: &str = env!("RKVM2_PROTO_VERSION_STRING");
+const MARKER_0: u8 = 0xBE;
+const MARKER_1: u8 = 0xEF;
+const MARKER_2: u8 = 0xCA;
+const MARKER_3: u8 = 0xFE;
+const MARKER: [u8;4] = [MARKER_0, MARKER_1, MARKER_2, MARKER_3];
+const MARKER_LEN: usize = 4;
+const HEADER_MESSAGE_LEN_LEN: usize = 4;
+const HEADER_LEN: usize = MARKER_LEN + HEADER_MESSAGE_LEN_LEN;
 
 include!(concat!(env!("OUT_DIR"), "/rkvm2.proto.rs"));
 
 #[derive(Default)]
 pub struct MessageCodec<T: ProstMessage> {
     _marker: PhantomData<T>,
+    buf: BytesMut,
+    next_message_len: usize
 }
 
 impl MessageCodec<Message> {
     pub fn new() -> Self {
-        MessageCodec::default() as MessageCodec<Message>
+        Self {
+            _marker: Default::default(),
+            buf: BytesMut::with_capacity(128),
+            next_message_len: 0,
+        }
     }
 }
 
@@ -31,11 +48,48 @@ impl<T: ProstMessage + Default> Decoder for MessageCodec<T> {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let message: Result<T, DecodeError> = ProstMessage::decode_length_delimited(src);
-        return match message {
-            Ok(t) => Ok(Some(t)),
-            Err(_e) => Ok(None),
-        };
+        self.buf.put(src);
+        let mut src = &mut self.buf;
+
+        if (self.next_message_len == 0 && src.len() < HEADER_LEN) || (self.next_message_len > src.len()) {
+            return Ok(None);
+        } else {
+            loop {
+                if self.next_message_len == 0 {
+                    match src.as_ref().chunks(MARKER_LEN).position(|c| c == &MARKER) {
+                        None => {
+                            return Ok(None)
+                        },
+                        Some(marker) => {
+                            if marker + HEADER_MESSAGE_LEN_LEN < src.len() {
+                                src.advance(marker + MARKER_LEN);
+                                self.next_message_len = src.get_u32() as usize;
+                            } else {
+                                return Ok(None);
+                            }
+                        }
+                    }
+                }
+                if self.next_message_len > src.len() {
+                    return Ok(None);
+                }
+                let expected_remaining = src.remaining() - self.next_message_len as usize;
+                self.next_message_len = 0;
+                let mut message = T::default();
+                let result = encoding::message::merge(WireType::LengthDelimited, &mut message, &mut src, DecodeContext::default());
+                if src.remaining() > expected_remaining {
+                    src.advance(src.remaining() - expected_remaining);
+                }
+                match result {
+                    Ok(_) => {
+                        return Ok(Some(message));
+                    }
+                    Err(e) => {
+                        log::debug!("Decoding error {}", e);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -43,10 +97,39 @@ impl<T: ProstMessage> Encoder<T> for MessageCodec<T> {
     type Error = io::Error;
 
     fn encode(&mut self, item: T, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut total_len = item.encoded_len();
+        total_len += encoding::encoded_len_varint(total_len as u64);
+        dst.put_slice(&MARKER);
+        dst.put_u32(total_len as u32);
         item.encode_length_delimited(dst)?;
         return Ok(());
     }
 }
+
+impl Header {
+    /// Given the current time, how much time has elapsed since this message was generated?
+    pub fn elapsed_time(&self, now: SystemTime) -> Option<Duration> {
+        if let Some(time) = &self.time {
+            if let Ok(time) = SystemTime::try_from(time.clone()) {
+                if let Ok(duration) = now.duration_since(time) {
+                    return Some(duration);
+                }
+            }
+        }
+        return None;
+    }
+}
+
+impl Message {
+    /// Given the current time, how much time has elapsed since this message was generated?
+    pub fn elapsed_time(&self, now: SystemTime) -> Option<Duration> {
+        match &self.header {
+            None => None,
+            Some(h) => h.elapsed_time(now)
+        }
+    }
+}
+
 //
 // pub trait ProtoBuilder: Sized {
 //     fn with_payload(self, payload_type: PayloadType) -> Self;

@@ -1,6 +1,7 @@
 use crate::linux::glue::{self, input_event, timeval};
 use rkvm2_proto::input_event::InputEventType;
 use rkvm2_proto::{InputEvent, KeyEvent, MouseMoveEvent};
+use prost_wkt_types::Timestamp;
 
 pub(crate) struct InputEventAdapter;
 impl InputEventAdapter {
@@ -28,7 +29,7 @@ impl InputEventAdapter {
         }
     }
 
-    pub(crate) fn from_raw(raw: input_event) -> Option<InputEvent> {
+    pub(crate) fn from_raw(raw: input_event) -> Option<(InputEvent, Timestamp)> {
         let input_event_type = match (raw.type_ as _, raw.code as _, raw.value) {
             (glue::EV_REL, glue::REL_WHEEL, value) => Some(InputEventType::Wheel(MouseMoveEvent {
                 delta: value as i32,
@@ -53,6 +54,6 @@ impl InputEventAdapter {
         if input_event_type.is_none() {
             return None;
         }
-        return Some(InputEvent { input_event_type });
+        return Some((InputEvent { input_event_type }, Timestamp { seconds: raw.time.tv_sec, nanos: (raw.time.tv_usec * 1000) as i32 }));
     }
 }

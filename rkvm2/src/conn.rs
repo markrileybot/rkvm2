@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 use std::io;
 use std::io::Error;
-use std::time::Duration;
+use std::time::{SystemTime, Duration};
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::sleep;
 
 use rkvm2_proto::Message;
@@ -38,36 +38,40 @@ impl Connection {
         connector: T,
         sender: UnboundedSender<Message>,
     ) -> UnboundedSender<Message> {
-        let (ret_sender, mut receiver) =
-            unbounded_channel() as (UnboundedSender<Message>, UnboundedReceiver<Message>);
+        let (ret_sender, mut receiver) = unbounded_channel::<Message>();
 
         tokio::spawn(async move {
             loop {
                 match connector.connect().await {
-                    Ok((mut sink, mut stream)) => loop {
-                        tokio::select! {
-                            maybe_msg = stream.next() => {
-                                match maybe_msg {
-                                    Some(Ok(message)) => {
-                                        let _ = sender.send(message);
-                                    }
-                                    Some(Err(e)) => {
-                                        log::warn!("Failed to read message {}", e);
-                                        break;
-                                    }
-                                    None => {}
-                                }
-                            }
-                            maybe_msg = receiver.recv() => {
-                                if let Some(message) = maybe_msg {
-                                    if let Err(e) = sink.send(message).await {
-                                        log::warn!("Failed to send {}", e);
-                                        break;
+                    Ok((mut sink, mut stream)) =>
+                        loop {
+                            tokio::select! {
+                                maybe_msg = stream.next() => {
+                                    match maybe_msg {
+                                        Some(Ok(message)) => {
+                                            log::trace!("{:?}", message.elapsed_time(SystemTime::now()));
+                                            if let Err(e) = sender.send(message) {
+                                                log::warn!("Failed to read message {}", e);
+                                                break;
+                                            }
+                                        }
+                                        Some(Err(e)) => {
+                                            log::warn!("Failed to read message {}", e);
+                                            break;
+                                        }
+                                        None => {}
                                     }
                                 }
+                                maybe_msg = receiver.recv() => {
+                                    if let Some(message) = maybe_msg {
+                                        if let Err(e) = sink.send(message).await {
+                                            log::warn!("Failed to send {}", e);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    },
+                        },
                     Err(e) => {
                         log::warn!("Failed to open {:?}. {}", connector, e);
                         sleep(Duration::from_secs(1)).await;
