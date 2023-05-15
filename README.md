@@ -55,5 +55,49 @@ $ sudo RUST_LOG=debug target/release/rkvm2-inputd -c $HOME/.config/rkvm2/config.
 
 5. Run rkvm2
 ```shell
-$ RUST_LOG=debug target/release/rkvm2
+$ ./target/release/rkvm2
+```
+## Make things run automagically.  Do this on all machines sharing the keyboard/mouse.
+
+1. Create a systemd unit for the input server in `/etc/systemd/system/rkvm2-inputd.service`
+
+```
+[Unit]
+Description=RKVM2 Input Daemon
+
+[Service]
+Type=simple
+ExecStart=/path/to/rkvm2/target/release/rkvm2-inputd -c /path/to/.config/rkvm2/config.yml
+Restart=on-failure
+RestartSec=1
+Environment=RUST_LOG=debug
+Environment=RUST_BACKTRACE=1
+
+[Install]
+WantedBy=default.target
+```
+
+2. Reload units
+
+```shell
+sudo systemctl daemon-reload
+```
+
+3. Enable the service
+
+```shell
+sudo systemctl enable rkvm2-inputd
+```
+
+4. Start the service
+
+```shell
+sudo systemctl start rkvm2-inputd
+```
+
+
+5. Start the client.  I use i3 so I have this in my sway config:
+
+```
+exec --no-startup-id exec systemd-cat -t rkvm2 /path/to/rkvm2/target/release/rkvm2
 ```
