@@ -13,21 +13,29 @@ Lots of work to be done, including:
 
 ## Setup
 
-1. Build 
+1. Install dependencies
+* [libevdev](https://www.freedesktop.org/wiki/Software/libevdev/) (development libraries)
+* [protobuf](https://grpc.io/docs/protoc-installation/) (compiler and development libraries)
+* [libclang-dev](https://releases.llvm.org/) (development libraries)
+
+On ubuntu, you can install these dependencies with:  `sudo apt install libevdev-dev protobuf-compiler libprotobuf-dev libclang-dev`
+
+2. Build 
 ```shell
 $ cargo build --release
 ```
-2. Make your config
+3. Make your config
 ```shell
-$ mkdir -p ~/.config/rkvm2 && ./target/release/rkvm2 --dump-config > ~/.config/rkvm2/config.yml
+$ mkdir -p ~/.config/rkvm2 && target/release/rkvm2 --dump-config > ~/.config/rkvm2/config.yml
 ```
 
 You'll get something that looks like this:
 ```yaml
 # RKVM2 Config
-#
+
 broadcast_address: 192.168.24.255:45321
 switch_keys:
+- RightCtrl
 - RightAlt
 commander_keys:
 - RightCtrl
@@ -36,15 +44,16 @@ commander: false
 socket_gid: 0
 ```
 
-Change the `commander` to `true` on the machine hosting the keyboard and mouse.  Also, change the `socket_gid` to a 
-group to which your user belongs.
+* Change the broadcast address.  You can find the broadcast address by running:  `ip address` on linux/mac or `ifconfig` on windows.
+* Change the `commander` to `true` on the machine hosting the keyboard and mouse.
+* Change the `socket_gid` to a group to which your user belongs (only required on linux/mac).
 
-3. Run the input server
+4. Run the input server
 ```shell
-$ sudo ./target/release/rkvm2-inputd -c /home/mriley/.config/rkvm2/config.yml
+$ sudo RUST_LOG=debug target/release/rkvm2-inputd -c $HOME/.config/rkvm2/config.yml
 ```
 
-4. Run rkvm2
+5. Run rkvm2
 ```shell
-$ ./target/release/rkvm2
+$ RUST_LOG=debug target/release/rkvm2
 ```
