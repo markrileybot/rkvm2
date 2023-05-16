@@ -1,16 +1,19 @@
-use crate::linux::device_id;
-use crate::linux::event::InputEventAdapter;
-use crate::linux::glue::{self, libevdev, libevdev_uinput};
-use nix::libc;
-use rkvm2_proto::InputEvent;
 use std::fs::{File, OpenOptions};
 use std::io::Error;
 use std::mem::MaybeUninit;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
+
+use nix::libc;
 use prost_wkt_types::Timestamp;
 use tokio::io::unix::AsyncFd;
+
+use rkvm2_proto::InputEvent;
+
+use crate::linux::device_id;
+use crate::linux::event::EvdevEventAdapter;
+use crate::linux::glue::{self, libevdev, libevdev_uinput};
 
 pub(crate) struct EventReader {
     file: AsyncFd<File>,
@@ -123,7 +126,7 @@ impl EventReader {
                 Err(_) => continue, // This means it would block.
             };
 
-            if let Some(event) = InputEventAdapter::from_raw(event) {
+            if let Some(event) = InputEvent::from_raw(event) {
                 return Ok(event);
             }
 

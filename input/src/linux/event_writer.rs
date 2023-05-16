@@ -5,8 +5,7 @@ use std::ops::RangeInclusive;
 use rkvm2_proto::InputEvent;
 
 use crate::linux::device_id;
-use crate::linux::event::InputEventAdapter;
-use crate::linux::glue::{self, input_event, libevdev, libevdev_uinput};
+use crate::linux::glue::{self, __s32, __u16, input_event, libevdev, libevdev_uinput, timeval};
 
 pub struct EventWriter {
     evdev: *mut libevdev,
@@ -53,38 +52,53 @@ impl EventWriter {
         }
 
         let uinput = unsafe { uinput.assume_init() };
+        let mut event_writer = Self { evdev, uinput };
 
-        Ok(Self { evdev, uinput })
+        // send to 0, 0?
+        event_writer.write_raw(input_event {
+            time: timeval { tv_sec: 0, tv_usec: 0 },
+            type_: glue::EV_ABS as _,
+            code: glue::ABS_X as _,
+            value: 0,
+        })?;
+
+        event_writer.write_raw(input_event {
+            time: timeval { tv_sec: 0, tv_usec: 0 },
+            type_: glue::EV_ABS as _,
+            code: glue::ABS_Y as _,
+            value: 0,
+        })?;
+
+        Ok(event_writer)
     }
 
     pub async fn write(&mut self, event: InputEvent) -> Result<(), Error> {
-        self.write_raw(InputEventAdapter::to_raw(event))
+        self.write_raw(event.into())
     }
 
     pub(crate) fn write_raw(&mut self, event: input_event) -> Result<(), Error> {
+        self.write_raw_0(event.type_, event.code, event.value)?;
+        self.write_raw_0(glue::EV_SYN as _, glue::SYN_REPORT as _, 0)?;
+        Ok(())
+    }
+
+    fn write_raw_0(&mut self, r#type: __u16, code: __u16, value: __s32) -> Result<(), Error> {
         // As far as tokio is concerned, the FD never becomes ready for writing, so just write it normally.
         // If an error happens, it will be propagated to caller and the FD is opened in nonblocking mode anyway,
         // so it shouldn't be an issue.
-        let events = [
-            (event.type_, event.code, event.value),
-            (glue::EV_SYN as _, glue::SYN_REPORT as _, 0), // Include EV_SYN.
-        ];
 
-        for (r#type, code, value) in events.iter().cloned() {
-            let ret = unsafe {
-                glue::libevdev_uinput_write_event(
-                    self.uinput as *const _,
-                    r#type as _,
-                    code as _,
-                    value,
-                )
-            };
+        let ret = unsafe {
+            glue::libevdev_uinput_write_event(
+                self.uinput as *const _,
+                r#type as _,
+                code as _,
+                value,
+            )
+        };
 
-            if ret < 0 {
-                return Err(Error::from_raw_os_error(-ret));
-            }
+        if ret < 0 {
+            return Err(Error::from_raw_os_error(-ret));
         }
-
         Ok(())
     }
 }
@@ -107,7 +121,7 @@ const TYPES: &[(u32, &[RangeInclusive<u32>])] = &[
 ];
 
 unsafe fn setup_evdev(evdev: *mut libevdev) -> Result<(), Error> {
-    glue::libevdev_set_name(evdev, b"rkvm\0".as_ptr() as *const _);
+    glue::libevdev_set_name(evdev, b"rkvm2\0".as_ptr() as *const _);
     glue::libevdev_set_id_vendor(evdev, device_id::VENDOR as _);
     glue::libevdev_set_id_product(evdev, device_id::PRODUCT as _);
     glue::libevdev_set_id_version(evdev, device_id::VERSION as _);

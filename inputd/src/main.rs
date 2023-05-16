@@ -31,6 +31,7 @@ async fn handle_stream<T: AsyncRead + AsyncWrite>(stream: T, commander: bool) {
     log::debug!("Received connection");
     let mut sequence_counter = 0u64;
     let mut sequence_tracker = 0u64;
+
     loop {
         tokio::select! {
             event = event_manager.read() => {

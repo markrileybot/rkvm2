@@ -1,12 +1,24 @@
-use crate::linux::glue::{self, input_event, timeval};
-use rkvm2_proto::input_event::InputEventType;
-use rkvm2_proto::{InputEvent, KeyEvent, MouseMoveEvent};
 use prost_wkt_types::Timestamp;
 
-pub(crate) struct InputEventAdapter;
-impl InputEventAdapter {
-    pub(crate) fn to_raw(e: InputEvent) -> input_event {
-        let (type_, code, value) = match e.input_event_type.unwrap() {
+use rkvm2_proto::{InputEvent, KeyEvent, MouseMoveEvent};
+use rkvm2_proto::input_event::InputEventType;
+
+use crate::linux::glue::{self, input_event, timeval};
+
+pub(crate) trait EvdevEventAdapter: Into<input_event> {
+    fn to_raw(self) -> input_event;
+    fn from_raw(e: input_event) -> Option<(Self, Timestamp)>;
+}
+
+impl Into<input_event> for InputEvent {
+    fn into(self) -> input_event {
+        self.to_raw()
+    }
+}
+
+impl EvdevEventAdapter for InputEvent {
+    fn to_raw(self) -> input_event {
+        let (type_, code, value) = match self.input_event_type.unwrap() {
             InputEventType::Key(e) => (glue::EV_KEY as _, e.key as u16, if e.down { 1 } else { 0 }),
             InputEventType::Button(e) => (
                 glue::EV_KEY as _,
@@ -29,7 +41,7 @@ impl InputEventAdapter {
         }
     }
 
-    pub(crate) fn from_raw(raw: input_event) -> Option<(InputEvent, Timestamp)> {
+    fn from_raw(raw: input_event) -> Option<(InputEvent, Timestamp)> {
         let input_event_type = match (raw.type_ as _, raw.code as _, raw.value) {
             (glue::EV_REL, glue::REL_WHEEL, value) => Some(InputEventType::Wheel(MouseMoveEvent {
                 delta: value as i32,
