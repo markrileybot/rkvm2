@@ -57,6 +57,7 @@ $ sudo RUST_LOG=debug target/release/rkvm2-inputd -c $HOME/.config/rkvm2/config.
 ```shell
 $ ./target/release/rkvm2
 ```
+
 ## Make things run automagically.  Do this on all machines sharing the keyboard/mouse.
 
 1. Create a systemd unit for the input server in `/etc/systemd/system/rkvm2-inputd.service`
@@ -94,7 +95,6 @@ sudo systemctl enable rkvm2-inputd
 ```shell
 sudo systemctl start rkvm2-inputd
 ```
-
 
 5. Start the client.  I use i3 so I have this in my sway config:
 
